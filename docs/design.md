@@ -1,8 +1,13 @@
-# Virtual Try-On API 設計資料
+# Virtual Try-On 設計資料
 
 ## 1. システム概要
 
-Vertex AI の `virtual-try-on-001` モデルを使い、人物画像と衣服画像からバーチャル試着結果を生成する API。
+Vertex AI の `virtual-try-on-001` モデルを使い、人物画像と衣服画像からバーチャル試着結果を生成する API および Web UI。
+
+- **バックエンド**: FastAPI（Cloud Run）
+- **ストレージ**: Cloud Storage（衣服・人物・結果画像）
+- **AI モデル**: Vertex AI `virtual-try-on-001`（試着）/ `imagen-3.0-generate-001`（サンプル画像生成）
+- **CI/CD**: Cloud Build（main ブランチ push → 自動デプロイ）
 
 ---
 
@@ -26,22 +31,24 @@ Vertex AI の `virtual-try-on-001` モデルを使い、人物画像と衣服画
 ┌─────────────────────────────────────────────────────────────┐
 │ Cloud Run (asia-northeast1)  ← FastAPI アプリ               │
 │                                                              │
-│  GET  /api/garments   ──────────────────────────┐           │
-│  POST /api/upload     ──────────────────────┐   │           │
-│  POST /api/tryon      ──────────────┐       │   │           │
-│  GET  /api/image      ─────────┐   │       │   │           │
-│  GET  /               (UI)     │   │       │   │           │
-└────────────────────────────────┼───┼───────┼───┼───────────┘
-                                 │   │       │   │
-              ┌──────────────────┘   │       │   │
-              │  画像プロキシ取得     │       │   │
-              ▼                      ▼       ▼   ▼
+│  GET  /api/garments    ─────────────────────────────┐       │
+│  GET  /api/mannequins  ─────────────────────────┐   │       │
+│  POST /api/upload      ─────────────────────┐   │   │       │
+│  POST /api/tryon       ─────────────┐       │   │   │       │
+│  GET  /api/image       ─────────┐   │       │   │   │       │
+│  GET  /                (UI)     │   │       │   │   │       │
+└────────────────────────────────┼───┼───────┼───┼───┼───────┘
+                                 │   │       │   │   │
+              ┌──────────────────┘   │       │   │   │
+              │  画像プロキシ取得     │       │   │   │
+              ▼                      ▼       ▼   ▼   ▼
 ┌────────────────────────┐   ┌──────────────────────────────┐
 │ Vertex AI              │   │ Cloud Storage                 │
 │ (asia-southeast1)      │   │ (asia-northeast1)             │
 │                        │   │                               │
 │ virtual-try-on-001     │   │ garments/   ← 衣服画像        │
-│ imagen-3.0-generate-001│   │ uploads/    ← 人物画像        │
+│ imagen-3.0-generate-001│   │ mannequins/ ← マネキン画像    │
+│                        │   │ uploads/    ← 人物画像        │
 │                        │   │ results/    ← 試着結果        │
 └────────────────────────┘   └──────────────────────────────┘
 ```
@@ -115,6 +122,7 @@ gcloud auth application-default login
 | `GCP_REGION` | | `asia-northeast1` | Cloud Run のリージョン |
 | `VERTEX_AI_REGION` | | `asia-southeast1` | Vertex AI API のリージョン |
 | `GCS_GARMENTS_PREFIX` | | `garments/` | 衣服画像の GCS プレフィックス |
+| `GCS_MANNEQUINS_PREFIX` | | `mannequins/` | マネキン画像の GCS プレフィックス |
 | `GCS_UPLOADS_PREFIX` | | `uploads/` | アップロード先プレフィックス |
 | `GCS_RESULTS_PREFIX` | | `results/` | 試着結果の保存先プレフィックス |
 
@@ -147,8 +155,9 @@ github_repo      = "virtual-try-on-sample"
 ```
 gs://BUCKET_NAME/
 ├── garments/
-│   ├── tops/          ← 衣服（上）画像
-│   └── bottoms/       ← 衣服（下）画像
+│   ├── tops/          ← トップス画像（Tシャツ・ブラウス・カーディガン等）
+│   └── bottoms/       ← ボトムス画像（パンツ・スカート等）
+├── mannequins/        ← マネキン画像（男性・女性）
 ├── uploads/           ← ユーザーがアップロードした人物画像（自動生成）
 └── results/           ← 試着結果画像（自動生成）
 ```
@@ -196,8 +205,9 @@ gcloud storage buckets create gs://BUCKET_NAME --location=asia-northeast1
         - Cloud Run サービス（初回はプレースホルダー）
         - Cloud Build トリガー（main push で発火）
 
-5. 衣服サンプル画像の生成・アップロード
-   └─ task generate-garments
+5. サンプル画像の生成・アップロード
+   └─ task generate-garments   # 衣服画像
+   └─ task generate-mannequins # マネキン画像
 
 6. 初回デプロイ
    └─ git push origin main
@@ -212,7 +222,156 @@ git push origin main  →  Cloud Build  →  Cloud Run（自動）
 
 ---
 
-## 9. API エンドポイント仕様
+## 9. Vertex AI Virtual Try-On API 仕様
+
+### エンドポイント
+
+```
+POST https://{region}-aiplatform.googleapis.com/v1/projects/{project}
+     /locations/{region}/publishers/google/models/virtual-try-on-001:predict
+```
+
+**対応リージョン**: `asia-southeast1`（シンガポール）のみ確認済み。`asia-northeast1`（東京）は未対応。
+
+### リクエスト形式
+
+```json
+{
+  "instances": [
+    {
+      "personImage": {
+        "image": {
+          "bytesBase64Encoded": "<base64エンコードされた人物画像>"
+        }
+      },
+      "productImages": [
+        {
+          "image": {
+            "bytesBase64Encoded": "<base64エンコードされた衣服画像>"
+          }
+        }
+      ]
+    }
+  ],
+  "parameters": {
+    "sampleCount": 1
+  }
+}
+```
+
+### レスポンス形式
+
+```json
+{
+  "predictions": [
+    {
+      "bytesBase64Encoded": "<base64エンコードされた試着結果画像>"
+    }
+  ]
+}
+```
+
+### API の制約・挙動
+
+| 制約 | 内容 |
+|------|------|
+| **1 呼び出しあたりの衣服数** | `productImages` に指定できるのは **1 枚のみ**（2 枚以上は 400 エラー） |
+| **衣服の除去** | API は person 画像に写っている既存の衣服を内部で除去した上で指定衣服を適用する |
+| **衣服カテゴリ指定** | トップス・ボトムスの区別を API に明示する手段はない（モデルが自動判定） |
+| **画像フォーマット** | PNG / JPEG 対応、base64 エンコードで送受信 |
+| **タイムアウト** | 1 衣服あたり最大約 60 秒 |
+
+---
+
+## 10. チェーン試着の設計
+
+### 課題
+
+Virtual Try-On API は **1 呼び出しにつき衣服 1 枚** しか指定できない。トップスとボトムスを同時に試着させることができない。
+
+### 解決策：サーバーサイドチェーン
+
+トップスとボトムスの両方が指定された場合、サーバー側で 2 回 API を連続呼び出しする。
+
+```
+原人物画像
+    │
+    ▼ API 呼び出し①（トップス）
+トップス試着済み画像
+    │
+    ▼ API 呼び出し②（ボトムス）
+トップス＋ボトムス試着済み画像（最終結果）
+```
+
+実装箇所: `app/services/vertex_ai.py` の `run_virtual_tryon()`
+
+```python
+def run_virtual_tryon(person_bytes, top_bytes, bottom_bytes) -> bytes:
+    result = person_bytes
+    if top_bytes:
+        result = _call_tryon(result, top_bytes)   # ① トップスを適用
+    if bottom_bytes:
+        result = _call_tryon(result, bottom_bytes) # ② その結果にボトムスを適用
+    return result
+```
+
+### 重要な発見：試着結果を人物画像に再利用できない
+
+試着結果（result 画像）を次の API 呼び出しの person 画像として使用すると、**先に適用した衣服が消える**。
+
+**原因**: API は入力された person 画像から衣服を除去してから新しい衣服を適用する設計のため、試着結果画像を person として渡しても、前の衣服が「上書き除去」される。
+
+**対応方針**: フロントエンドは常に **元の人物画像 URI（`originalPersonGcsUri`）** をベースとし、現在選択中のすべての衣服を一括で API に送る。試着結果の GCS URI を次の呼び出しの person に使わない。
+
+```
+【NG】試着結果を person に再利用
+  original → API(top) → result1(GCS) → API(bottom) → result2
+                                ↑ここでトップスが消える
+
+【OK】毎回 original から出発してチェーン
+  original → API(top) → in-memory bytes → API(bottom) → result2
+             ←────────── run_virtual_tryon() の内部処理 ──────────→
+```
+
+### フロントエンドの状態管理
+
+| 変数 | 説明 |
+|------|------|
+| `originalPersonGcsUri` | 選択した人物画像の GCS URI（変更されない） |
+| `selectedTop` | 現在選択中のトップス `{gcsUri, label}` |
+| `selectedBottom` | 現在選択中のボトムス `{gcsUri, label}` |
+
+衣服カードを選択するたびに `selectedTop` または `selectedBottom` が更新され、`/api/tryon` に `originalPersonGcsUri` + 現在選択中の全衣服を送信する。
+
+### ユーザー操作フロー
+
+```
+① 人物を選択（マネキン or アップロード）
+        │
+② 衣服カードをクリック（自動試着トリガー）
+        │
+        ├─ トップスのみ選択 → API①のみ実行
+        ├─ ボトムスのみ選択 → API①のみ実行
+        └─ 両方選択済みの場合 → API①②を連続実行（最大2分）
+        │
+③ 試着結果表示（試着前 / 試着後 の横並び比較）
+        │
+④ 別の衣服を選択 → ②に戻る（selectedTop/Bottom が更新されて再試着）
+        │
+⑤ リセットボタン → 選択クリア、元の人物画像に戻る
+```
+
+### 既知の制限
+
+| 制限 | 説明 |
+|------|------|
+| **上着のみ試着すると下半身が素体に見える** | API が person 画像の衣服を除去して上着のみ適用するため。ボトムスも合わせて選択することで解消する。 |
+| **同種の衣服を重ねられない** | トップスは 1 枚のみ有効。新しいトップスを選ぶと前のトップスは置き換わる。 |
+| **試着順序は固定** | 必ずトップス→ボトムスの順で適用される。 |
+
+---
+
+## 11. API エンドポイント仕様（FastAPI）
 
 ### GET /health
 
@@ -229,6 +388,12 @@ git push origin main  →  Cloud Build  →  Cloud Run（自動）
 
 GCS の `garments/` 配下の衣服一覧を返す。
 
+**Query Parameters**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `category` | string（任意）| `tops` または `bottoms` で絞り込み |
+
 **Response**
 ```json
 [
@@ -239,6 +404,26 @@ GCS の `garments/` 配下の衣服一覧を返す。
   }
 ]
 ```
+
+---
+
+### GET /api/mannequins
+
+GCS の `mannequins/` 配下のマネキン画像一覧を返す。
+
+**Response**
+```json
+[
+  {
+    "name": "male-1.png",
+    "gcs_uri": "gs://bucket/mannequins/male-1.png",
+    "image_url": "/api/image?uri=gs%3A%2F%2F...",
+    "gender": "male"
+  }
+]
+```
+
+`gender` はファイル名先頭が `female` なら `"female"`、それ以外は `"male"`。
 
 ---
 
@@ -270,10 +455,19 @@ Virtual Try-On API を呼び出し、試着結果を返す。
 
 ```json
 {
-  "person_gcs_uri": "gs://bucket/uploads/uuid.jpg",
-  "garment_gcs_uri": "gs://bucket/garments/tops/white-tshirt.png"
+  "person_gcs_uri": "gs://bucket/mannequins/male-1.png",
+  "top_gcs_uri": "gs://bucket/garments/tops/white-tshirt.png",
+  "bottom_gcs_uri": "gs://bucket/garments/bottoms/blue-jeans.png"
 }
 ```
+
+| フィールド | 必須 | 説明 |
+|-----------|------|------|
+| `person_gcs_uri` | ✓ | 人物画像の GCS URI |
+| `top_gcs_uri` | △ | トップス画像の GCS URI（`top_gcs_uri` か `bottom_gcs_uri` のどちらかは必須） |
+| `bottom_gcs_uri` | △ | ボトムス画像の GCS URI |
+
+両方指定された場合はサーバーサイドでチェーン実行（トップス→ボトムスの順）。
 
 **Response**
 ```json
@@ -287,7 +481,7 @@ Virtual Try-On API を呼び出し、試着結果を返す。
 
 | ステータス | 説明 |
 |-----------|------|
-| `400` | GCS から画像を取得できない |
+| `400` | GCS から画像を取得できない、またはリクエストパラメータ不正 |
 | `502` | Vertex AI API エラー |
 
 ---
@@ -295,6 +489,8 @@ Virtual Try-On API を呼び出し、試着結果を返す。
 ### GET /api/image
 
 GCS オブジェクトをプロキシ配信する。
+
+Signed URL の代わりにこのエンドポイントを使う。Application Default Credentials（ADC）はユーザー認証情報を使うため署名付き URL の生成に必要な秘密鍵を持たない。Cloud Run 上でも同様にサービスアカウントの鍵ファイルなしで動作させるためプロキシ方式を採用。
 
 **Query Parameters**
 
@@ -306,7 +502,7 @@ GCS オブジェクトをプロキシ配信する。
 
 ---
 
-## 10. 技術スタック
+## 12. 技術スタック
 
 | カテゴリ | 採用技術 | バージョン |
 |---------|---------|-----------|
