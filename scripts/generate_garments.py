@@ -23,7 +23,7 @@ GARMENTS_PREFIX = os.environ.get("GCS_GARMENTS_PREFIX", "garments/")
 
 GARMENTS = [
     # (ファイル名, プロンプト)
-    # ---- トップス ----
+    # ---- トップス（共通） ----
     (
         "tops/white-tshirt.png",
         "white plain cotton t-shirt, flat lay on pure white background, "
@@ -44,7 +44,28 @@ GARMENTS = [
         "light blue pullover hoodie sweatshirt, flat lay on pure white background, "
         "front view, product photography, clean minimal style",
     ),
-    # ---- ボトムス ----
+    # ---- トップス（女性向け） ----
+    (
+        "tops/womens-white-blouse.png",
+        "women's white flowy chiffon blouse with delicate ruffles, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "tops/womens-floral-top.png",
+        "women's floral print short-sleeve top, pink and white flowers pattern, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "tops/womens-pink-knit.png",
+        "women's soft pink cable-knit cropped sweater, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "tops/womens-beige-cardigan.png",
+        "women's beige open-front longline cardigan, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    # ---- ボトムス（共通） ----
     (
         "bottoms/blue-jeans.png",
         "blue straight-leg denim jeans, flat lay on pure white background, "
@@ -65,6 +86,27 @@ GARMENTS = [
         "grey cotton sweatpants joggers, flat lay on pure white background, "
         "front view, product photography, clean minimal style",
     ),
+    # ---- スカート（女性向け） ----
+    (
+        "bottoms/floral-midi-skirt.png",
+        "women's floral print chiffon midi skirt, pink and white flowers, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "bottoms/white-pleated-skirt.png",
+        "women's white pleated mini skirt, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "bottoms/black-mini-skirt.png",
+        "women's black A-line mini skirt, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
+    (
+        "bottoms/denim-skirt.png",
+        "women's light blue denim mini skirt with front buttons, "
+        "flat lay on pure white background, front view, product photography, clean minimal style",
+    ),
 ]
 
 
@@ -78,7 +120,13 @@ def main():
     imagen_client = genai.Client(vertexai=True, project=GCP_PROJECT, location=VERTEX_AI_REGION)
     gcs_client = storage.Client(project=GCP_PROJECT)
 
-    for i, (filename, prompt) in enumerate(GARMENTS):
+    bucket = gcs_client.bucket(GCS_BUCKET)
+    pending = [(fn, pr) for fn, pr in GARMENTS if not bucket.blob(f"{GARMENTS_PREFIX}{fn}").exists()]
+    skipped = len(GARMENTS) - len(pending)
+    if skipped:
+        print(f"Skipping {skipped} already-uploaded image(s).\n")
+
+    for i, (filename, prompt) in enumerate(pending):
         blob_name = f"{GARMENTS_PREFIX}{filename}"
         print(f"Generating: {filename}")
         try:
@@ -86,7 +134,7 @@ def main():
             upload_to_gcs(gcs_client, GCS_BUCKET, image_bytes, blob_name)
         except Exception as e:
             print(f"  ✗ failed: {e}", file=sys.stderr)
-        if i < len(GARMENTS) - 1:
+        if i < len(pending) - 1:
             sleep_between_requests()
 
     print("\nDone.")
