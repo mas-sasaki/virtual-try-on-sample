@@ -10,11 +10,11 @@ Imagen 3 でマネキン画像を生成して GCS にアップロードするス
 
 import os
 import sys
-import time
 
 from google import genai
-from google.genai import types
 from google.cloud import storage
+
+from scripts.utils import generate_image, upload_to_gcs, sleep_between_requests
 
 GCP_PROJECT = os.environ["GCP_PROJECT"]
 GCS_BUCKET = os.environ["GCS_BUCKET"]
@@ -52,28 +52,6 @@ MANNEQUINS = [
 ]
 
 
-def generate_image(client: genai.Client, prompt: str) -> bytes:
-    response = client.models.generate_images(
-        model="imagen-3.0-generate-001",
-        prompt=prompt,
-        config=types.GenerateImagesConfig(
-            number_of_images=1,
-            aspect_ratio="3:4",
-            person_generation="allow_adult",
-        ),
-    )
-    return response.generated_images[0].image.image_bytes
-
-
-def upload_to_gcs(gcs_client: storage.Client, image_bytes: bytes, blob_name: str) -> str:
-    bucket = gcs_client.bucket(GCS_BUCKET)
-    blob = bucket.blob(blob_name)
-    blob.upload_from_string(image_bytes, content_type="image/png")
-    uri = f"gs://{GCS_BUCKET}/{blob_name}"
-    print(f"  ✓ uploaded: {uri}")
-    return uri
-
-
 def main():
     print(f"Project      : {GCP_PROJECT}")
     print(f"Bucket       : {GCS_BUCKET}")
@@ -81,22 +59,19 @@ def main():
     print(f"Prefix       : {MANNEQUINS_PREFIX}")
     print()
 
-    imagen_client = genai.Client(
-        vertexai=True,
-        project=GCP_PROJECT,
-        location=VERTEX_AI_REGION,
-    )
+    imagen_client = genai.Client(vertexai=True, project=GCP_PROJECT, location=VERTEX_AI_REGION)
     gcs_client = storage.Client(project=GCP_PROJECT)
 
-    for filename, prompt in MANNEQUINS:
+    for i, (filename, prompt) in enumerate(MANNEQUINS):
         blob_name = f"{MANNEQUINS_PREFIX}{filename}"
         print(f"Generating: {filename}")
         try:
-            image_bytes = generate_image(imagen_client, prompt)
-            upload_to_gcs(gcs_client, image_bytes, blob_name)
+            image_bytes = generate_image(imagen_client, prompt, aspect_ratio="3:4", person_generation="allow_adult")
+            upload_to_gcs(gcs_client, GCS_BUCKET, image_bytes, blob_name)
         except Exception as e:
             print(f"  ✗ failed: {e}", file=sys.stderr)
-        time.sleep(2)
+        if i < len(MANNEQUINS) - 1:
+            sleep_between_requests()
 
     print("\nDone.")
 
