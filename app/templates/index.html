@@ -528,12 +528,12 @@
 
 <script>
   // ===== State =====
-  let personGcsUri         = null; // current person (updates to result after each try-on)
-  let originalPersonGcsUri = null; // original selection (for reset)
+  let originalPersonGcsUri = null;
   let originalPersonImgUrl = null;
   let originalPersonLabel  = null;
   let isTryingOn           = false;
-  let appliedGarments      = []; // [{label, kind}]
+  let selectedTop          = null; // {gcsUri, label}
+  let selectedBottom       = null; // {gcsUri, label}
 
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', () => {
@@ -562,7 +562,7 @@
   }
 
   function clearPerson() {
-    personGcsUri = originalPersonGcsUri = originalPersonImgUrl = originalPersonLabel = null;
+    originalPersonGcsUri = originalPersonImgUrl = originalPersonLabel = null;
     document.getElementById('personPreview').style.display = 'none';
     document.getElementById('personStepSub').textContent = '';
     resetTryonState(/* clearResult= */ true);
@@ -662,7 +662,9 @@
     }
     grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
-    runTryOn(gcsUri, label, kind);
+    if (kind === 'top')  selectedTop    = { gcsUri, label };
+    else                 selectedBottom = { gcsUri, label };
+    runTryOn();
   }
 
   // ===== Helpers =====
@@ -678,7 +680,6 @@
   }
 
   function setPerson(uri, imageUrl, label) {
-    personGcsUri = uri;
     originalPersonGcsUri = uri;
     originalPersonImgUrl = imageUrl;
     originalPersonLabel  = label;
@@ -714,8 +715,8 @@
 
   // ===== Reset =====
   function resetTryonState(clearResult) {
-    appliedGarments = [];
-    personGcsUri = originalPersonGcsUri; // restore base
+    selectedTop = null;
+    selectedBottom = null;
     clearGarmentSelection();
     document.getElementById('appliedChips').innerHTML = '';
     document.getElementById('appliedChips').style.display = 'none';
@@ -740,19 +741,21 @@
   // ===== Applied chips =====
   function updateAppliedChips() {
     const el = document.getElementById('appliedChips');
-    el.innerHTML = appliedGarments.map(g =>
-      `<span class="applied-chip chip-${g.kind}">${g.kind === 'top' ? 'トップス' : 'ボトムス'}: ${g.label}</span>`
-    ).join('');
-    el.style.display = appliedGarments.length ? '' : 'none';
+    const chips = [];
+    if (selectedTop)    chips.push(`<span class="applied-chip chip-top">トップス: ${selectedTop.label}</span>`);
+    if (selectedBottom) chips.push(`<span class="applied-chip chip-bottom">ボトムス: ${selectedBottom.label}</span>`);
+    el.innerHTML = chips.join('');
+    el.style.display = chips.length ? '' : 'none';
   }
 
   // ===== Try-On =====
-  async function runTryOn(garmentGcsUri, garmentLabel, kind) {
+  async function runTryOn() {
     lockGarments();
 
+    const both    = selectedTop && selectedBottom;
     const status  = document.getElementById('tryonStatus');
     const spinner = document.getElementById('spinner');
-    status.textContent = '試着処理中... (最大1分)';
+    status.textContent = both ? 'トップス→ボトムスの順に処理中... (最大2分)' : '試着処理中... (最大1分)';
     status.className = 'status-msg';
     spinner.classList.add('visible');
 
@@ -762,9 +765,10 @@
       </div>`;
 
     try {
-      const body = { person_gcs_uri: personGcsUri };
-      if (kind === 'top')    body.top_gcs_uri    = garmentGcsUri;
-      else                   body.bottom_gcs_uri = garmentGcsUri;
+      // 常に original person から出発し、現在選択中の全衣服を送る
+      const body = { person_gcs_uri: originalPersonGcsUri };
+      if (selectedTop)    body.top_gcs_uri    = selectedTop.gcsUri;
+      if (selectedBottom) body.bottom_gcs_uri = selectedBottom.gcsUri;
 
       const res = await fetch('/api/tryon', {
         method: 'POST',
@@ -774,14 +778,10 @@
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
       const data = await res.json();
 
-      // Advance person → result for next chained try-on
-      personGcsUri = data.result_gcs_uri;
-      appliedGarments.push({ label: garmentLabel, kind });
-
       document.getElementById('resultWrap').innerHTML =
         `<img class="result-img" src="${data.result_url}" alt="試着結果">`;
 
-      status.textContent = '完了 — 別の衣服を選ぶと重ねて試着できます';
+      status.textContent = '完了 — 衣服を変更・追加できます';
       updateAppliedChips();
       document.getElementById('btnReset').style.display = '';
       document.getElementById('chainHint').style.display = '';
