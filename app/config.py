@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     vertex_ai_region: str = "asia-southeast1"
     gcs_bucket: str
     gcs_garments_prefix: str = "garments/"
+    gcs_mannequins_prefix: str = "mannequins/"
     gcs_uploads_prefix: str = "uploads/"
     gcs_results_prefix: str = "results/"
 

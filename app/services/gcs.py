@@ -14,22 +14,34 @@ def _image_url(gcs_uri: str) -> str:
     return "/api/image?" + urlencode({"uri": gcs_uri})
 
 
-def list_garments() -> list[dict]:
+def _list_blobs(prefix: str) -> list[dict]:
     client = _client()
-    blobs = client.list_blobs(settings.gcs_bucket, prefix=settings.gcs_garments_prefix)
+    blobs = client.list_blobs(settings.gcs_bucket, prefix=prefix)
     results = []
     for blob in blobs:
-        if blob.name == settings.gcs_garments_prefix:
+        if blob.name == prefix:
             continue
         gcs_uri = f"gs://{settings.gcs_bucket}/{blob.name}"
         results.append(
             {
-                "name": blob.name.removeprefix(settings.gcs_garments_prefix),
+                "name": blob.name.removeprefix(prefix),
                 "gcs_uri": gcs_uri,
                 "image_url": _image_url(gcs_uri),
             }
         )
     return results
+
+
+def list_garments() -> list[dict]:
+    return _list_blobs(settings.gcs_garments_prefix)
+
+
+def list_mannequins() -> list[dict]:
+    items = _list_blobs(settings.gcs_mannequins_prefix)
+    for item in items:
+        name = item["name"]
+        item["gender"] = "female" if name.startswith("female") else "male"
+    return items
 
 
 def upload_user_image(file_bytes: bytes, content_type: str) -> dict:

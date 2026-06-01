@@ -4,28 +4,67 @@
   <meta charset="UTF-8">
   <title>Virtual Try-On API テスト</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    body { font-family: sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; }
     h1 { font-size: 1.4rem; }
     section { margin: 24px 0; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
     h2 { font-size: 1rem; margin: 0 0 12px; }
     button { padding: 8px 16px; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: default; }
     img { max-width: 100%; margin-top: 12px; border: 1px solid #ccc; border-radius: 4px; }
     select { width: 100%; padding: 6px; }
     .status { margin-top: 8px; font-size: 0.875rem; color: #555; }
     .error { color: #c00; }
+
+    /* タブ */
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tab { padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: #f5f5f5; }
+    .tab.active { background: #333; color: #fff; border-color: #333; }
+
+    /* マネキングリッド */
+    .mannequin-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .mannequin-card {
+      width: 120px; cursor: pointer; border: 2px solid #ddd; border-radius: 6px;
+      padding: 6px; text-align: center; font-size: 0.8rem;
+    }
+    .mannequin-card.selected { border-color: #333; background: #f0f0f0; }
+    .mannequin-card img { width: 100%; height: 140px; object-fit: cover; border: none; margin: 0; }
+
+    .gender-label {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.75rem; margin-bottom: 6px;
+    }
+    .gender-label.male { background: #dbeafe; color: #1e40af; }
+    .gender-label.female { background: #fce7f3; color: #9d174d; }
   </style>
 </head>
 <body>
   <h1>Virtual Try-On API テスト UI</h1>
 
+  <!-- Step 1 -->
   <section>
-    <h2>Step 1: 人物画像をアップロード</h2>
-    <input type="file" id="personFile" accept="image/jpeg,image/png">
-    <button onclick="uploadPerson()">アップロード</button>
-    <div class="status" id="uploadStatus"></div>
-    <img id="personPreview" style="display:none; max-height:300px;">
+    <h2>Step 1: 人物を選択</h2>
+    <div class="tabs">
+      <div class="tab active" id="tabUpload" onclick="switchTab('upload')">写真をアップロード</div>
+      <div class="tab" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
+    </div>
+
+    <!-- アップロードパネル -->
+    <div id="panelUpload">
+      <input type="file" id="personFile" accept="image/jpeg,image/png">
+      <button onclick="uploadPerson()">アップロード</button>
+      <div class="status" id="uploadStatus"></div>
+      <img id="personPreview" style="display:none; max-height:300px;">
+    </div>
+
+    <!-- マネキン選択パネル -->
+    <div id="panelMannequin" style="display:none;">
+      <button onclick="loadMannequins()">マネキン一覧を取得</button>
+      <div id="mannequinStatus" class="status"></div>
+      <div id="mannequinGrid" class="mannequin-grid"></div>
+    </div>
   </section>
 
+  <!-- Step 2 -->
   <section>
     <h2>Step 2: 衣服を選択</h2>
     <button onclick="loadGarments()">衣服一覧を取得</button>
@@ -35,6 +74,7 @@
     <img id="garmentPreview" style="display:none; max-height:200px;">
   </section>
 
+  <!-- Step 3 -->
   <section>
     <h2>Step 3: 試着する</h2>
     <button onclick="runTryOn()" id="tryonBtn" disabled>試着する</button>
@@ -46,23 +86,33 @@
     let personGcsUri = null;
     let garmentGcsUri = null;
 
+    // ---- タブ切替 ----
+    function switchTab(tab) {
+      document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
+      document.getElementById('tabMannequin').classList.toggle('active', tab === 'mannequin');
+      document.getElementById('panelUpload').style.display = tab === 'upload' ? '' : 'none';
+      document.getElementById('panelMannequin').style.display = tab === 'mannequin' ? '' : 'none';
+      personGcsUri = null;
+      document.getElementById('personPreview').style.display = 'none';
+      document.getElementById('mannequinGrid').innerHTML = '';
+      updateTryonBtn();
+    }
+
+    // ---- アップロード ----
     async function uploadPerson() {
       const file = document.getElementById('personFile').files[0];
       if (!file) { alert('ファイルを選択してください'); return; }
-
       const status = document.getElementById('uploadStatus');
       status.textContent = 'アップロード中...';
       status.className = 'status';
-
       const form = new FormData();
       form.append('file', file);
-
       try {
         const res = await fetch('/api/upload', { method: 'POST', body: form });
         if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
         const data = await res.json();
         personGcsUri = data.gcs_uri;
-        status.textContent = `アップロード完了: ${data.gcs_uri}`;
+        status.textContent = `完了: ${data.gcs_uri}`;
         const img = document.getElementById('personPreview');
         img.src = data.image_url;
         img.style.display = 'block';
@@ -73,6 +123,45 @@
       }
     }
 
+    // ---- マネキン ----
+    async function loadMannequins() {
+      const status = document.getElementById('mannequinStatus');
+      status.textContent = '取得中...';
+      try {
+        const res = await fetch('/api/mannequins');
+        if (!res.ok) throw new Error(await res.text());
+        const items = await res.json();
+        status.textContent = '';
+        const grid = document.getElementById('mannequinGrid');
+        grid.innerHTML = '';
+        if (items.length === 0) { status.textContent = 'マネキン画像がありません'; return; }
+        items.forEach(m => {
+          const card = document.createElement('div');
+          card.className = 'mannequin-card';
+          card.dataset.uri = m.gcs_uri;
+          const label = m.gender === 'female' ? '女性' : '男性';
+          const labelClass = m.gender === 'female' ? 'female' : 'male';
+          card.innerHTML = `
+            <span class="gender-label ${labelClass}">${label}</span>
+            <img src="${m.image_url}" alt="${m.name}">
+            <div>${m.name}</div>`;
+          card.onclick = () => selectMannequin(card, m.gcs_uri);
+          grid.appendChild(card);
+        });
+      } catch (e) {
+        status.textContent = `エラー: ${e.message}`;
+        status.className = 'status error';
+      }
+    }
+
+    function selectMannequin(card, uri) {
+      document.querySelectorAll('.mannequin-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      personGcsUri = uri;
+      updateTryonBtn();
+    }
+
+    // ---- 衣服 ----
     async function loadGarments() {
       const res = await fetch('/api/garments');
       const items = await res.json();
@@ -100,13 +189,13 @@
       document.getElementById('tryonBtn').disabled = !(personGcsUri && garmentGcsUri);
     }
 
+    // ---- 試着 ----
     async function runTryOn() {
       const status = document.getElementById('tryonStatus');
       status.textContent = '試着処理中... (最大1分程度かかります)';
       status.className = 'status';
       document.getElementById('tryonBtn').disabled = true;
       document.getElementById('resultImage').style.display = 'none';
-
       try {
         const res = await fetch('/api/tryon', {
           method: 'POST',
