@@ -1,10 +1,23 @@
+# Nix / direnv
 .direnv/
-.DS_Store
+
+# Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Terraform
 .terraform/
 *.tfstate
 *.tfstate.backup
+terraform/terraform.tfvars
+
+# Environment / secrets
 .env
+.envrc
+
+# Claude Code
 .claude/
+
+# OS
+.DS_Store

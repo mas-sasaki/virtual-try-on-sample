@@ -1,9 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-
     gcp_project: str
     gcp_region: str = "us-central1"
     gcs_bucket: str
