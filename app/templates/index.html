@@ -2,250 +2,777 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Virtual Try-On API テスト</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Try-On</title>
   <style>
-    body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
-    h1 { font-size: 1.4rem; }
-    section { margin: 24px 0; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
-    h2 { font-size: 1rem; margin: 0 0 12px; }
-    button { padding: 8px 16px; cursor: pointer; }
-    button:disabled { opacity: 0.4; cursor: default; }
-    img { max-width: 100%; margin-top: 12px; border: 1px solid #ccc; border-radius: 4px; }
-    .status { margin-top: 8px; font-size: 0.875rem; color: #555; }
-    .error { color: #c00; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* タブ */
-    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .tab { padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: #f5f5f5; }
-    .tab.active { background: #333; color: #fff; border-color: #333; }
-
-    /* マネキン・衣服グリッド共通 */
-    .item-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
-    .item-card {
-      width: 110px; cursor: pointer; border: 2px solid #ddd; border-radius: 6px;
-      padding: 6px; text-align: center; font-size: 0.75rem;
+    :root {
+      --primary:      #4f46e5;
+      --primary-h:    #4338ca;
+      --bg:           #f1f5f9;
+      --surface:      #ffffff;
+      --surface-2:    #f8fafc;
+      --border:       #e2e8f0;
+      --text:         #0f172a;
+      --text-muted:   #64748b;
+      --male-bg:      #dbeafe; --male-fg:   #1d4ed8;
+      --female-bg:    #fce7f3; --female-fg: #be185d;
+      --radius:       12px;
+      --radius-sm:    8px;
+      --shadow:       0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-md:    0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04);
+      --shadow-lg:    0 10px 24px -4px rgba(0,0,0,.10);
     }
-    .item-card.selected { border-color: #333; background: #f0f0f0; }
-    .item-card img { width: 100%; height: 120px; object-fit: cover; border: none; margin: 0 0 4px; border-radius: 3px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ---- Header ---- */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .header-icon {
+      width: 34px; height: 34px;
+      background: var(--primary);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 17px;
+    }
+    header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
+    .header-badge {
+      margin-left: 4px;
+      padding: 2px 8px;
+      background: #ede9fe;
+      color: var(--primary);
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    /* ---- Layout ---- */
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px 24px;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .left-col { display: flex; flex-direction: column; gap: 16px; }
+    .right-col { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 16px; }
+
+    /* ---- Card ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .step-num {
+      width: 26px; height: 26px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-title { font-size: 0.95rem; font-weight: 600; }
+    .step-sub { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; }
+
+    /* ---- Tabs ---- */
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      margin-bottom: 16px;
+    }
+    .tab {
+      flex: 1;
+      padding: 7px 0;
+      text-align: center;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all .15s;
+    }
+    .tab.active {
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: var(--shadow);
+      font-weight: 600;
+    }
+
+    /* ---- Item grids ---- */
+    .item-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+
+    .item-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color .15s, transform .1s, box-shadow .15s;
+      position: relative;
+      background: var(--surface-2);
+    }
+    .item-card:hover { border-color: #a5b4fc; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .item-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px #e0e7ff; }
+    .item-card.selected .check {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .item-card .thumb {
+      width: 100%;
+      aspect-ratio: 3/4;
+      object-fit: cover;
+      display: block;
+      background: #f1f5f9;
+    }
+    .item-card.square .thumb { aspect-ratio: 1/1; }
+
+    .item-card .label {
+      padding: 5px 6px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      background: var(--surface);
+    }
+
+    .check {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 20px; height: 20px;
+      background: var(--primary);
+      border-radius: 50%;
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      opacity: 0;
+      transform: scale(.5);
+      transition: all .15s;
+    }
 
     .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 0.7rem; margin-bottom: 4px;
+      position: absolute;
+      top: 6px; left: 6px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 600;
     }
-    .badge-male   { background: #dbeafe; color: #1e40af; }
-    .badge-female { background: #fce7f3; color: #9d174d; }
+    .badge-male   { background: var(--male-bg);   color: var(--male-fg); }
+    .badge-female { background: var(--female-bg); color: var(--female-fg); }
 
-    /* 衣服2カラム */
-    .garment-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
-    .garment-col h3 { font-size: 0.9rem; margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
-    .selected-info { font-size: 0.8rem; color: #555; margin-top: 6px; min-height: 1.2em; }
+    /* ---- Garment two-col ---- */
+    .garment-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .garment-col-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .garment-col-title .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .dot-top    { background: #818cf8; }
+    .dot-bottom { background: #34d399; }
+    .selected-hint { font-size: 0.72rem; color: var(--primary); margin-top: 6px; min-height: 1em; }
+
+    /* ---- Upload area ---- */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      position: relative;
+    }
+    .upload-area:hover { border-color: #a5b4fc; background: #f5f3ff; }
+    .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-area p { font-size: 0.8rem; color: var(--text-muted); }
+    .upload-area strong { color: var(--primary); }
+
+    /* ---- Upload button ---- */
+    .btn-upload {
+      margin-top: 12px;
+      width: 100%;
+      padding: 9px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: background .15s;
+    }
+    .btn-upload:hover { background: #ede9fe; color: var(--primary); }
+
+    /* ---- Person preview ---- */
+    .person-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-top: 12px;
+    }
+    .person-preview img { width: 54px; height: 72px; object-fit: cover; border-radius: 6px; }
+    .person-preview .pinfo { flex: 1; }
+    .person-preview .pname { font-size: 0.8rem; font-weight: 600; }
+    .person-preview .psub  { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .person-preview .pchange {
+      font-size: 0.75rem;
+      color: var(--primary);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px 8px;
+    }
+
+    /* ---- Right panel ---- */
+    .summary-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-row:last-of-type { border-bottom: none; }
+    .summary-row .sthumb {
+      width: 40px; height: 50px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .summary-row .sthumb.square { height: 40px; }
+    .summary-label { font-size: 0.75rem; color: var(--text-muted); }
+    .summary-name  { font-size: 0.8rem; font-weight: 500; }
+    .summary-none  { font-size: 0.8rem; color: #cbd5e1; font-style: italic; }
+
+    .btn-tryon {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      letter-spacing: .01em;
+    }
+    .btn-tryon:hover:not(:disabled) {
+      background: var(--primary-h);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    .btn-tryon:active:not(:disabled) { transform: translateY(0); }
+    .btn-tryon:disabled { background: #c7d2fe; cursor: not-allowed; }
+
+    /* ---- Status / loading ---- */
+    .status-msg {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .status-msg.error { color: #ef4444; }
+
+    .spinner {
+      display: none;
+      margin: 12px auto;
+      width: 32px; height: 32px;
+      border: 3px solid #e0e7ff;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    .spinner.visible { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Result ---- */
+    .result-wrap {
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-placeholder {
+      text-align: center;
+      color: #cbd5e1;
+      padding: 32px;
+    }
+    .result-placeholder .ri { font-size: 3rem; margin-bottom: 8px; }
+    .result-placeholder p { font-size: 0.8rem; }
+    .result-img { width: 100%; display: block; }
+
+    .skeleton {
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skeleton-card { height: 140px; }
+
+    /* ---- Loading state for grids ---- */
+    .loading-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+    .loading-grid .skeleton-card { border-radius: var(--radius-sm); }
   </style>
 </head>
 <body>
-  <h1>Virtual Try-On API テスト UI</h1>
 
-  <!-- Step 1: 人物 -->
-  <section>
-    <h2>Step 1: 人物を選択</h2>
-    <div class="tabs">
-      <div class="tab active" id="tabUpload" onclick="switchTab('upload')">写真をアップロード</div>
-      <div class="tab" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
-    </div>
+<header>
+  <div class="header-icon">👗</div>
+  <div>
+    <h1>Virtual Try-On <span class="header-badge">Demo</span></h1>
+  </div>
+</header>
 
-    <div id="panelUpload">
-      <input type="file" id="personFile" accept="image/jpeg,image/png">
-      <button onclick="uploadPerson()">アップロード</button>
-      <div class="status" id="uploadStatus"></div>
-      <img id="personPreview" style="display:none; max-height:280px;">
-    </div>
+<main>
+  <!-- ===== LEFT COL ===== -->
+  <div class="left-col">
 
-    <div id="panelMannequin" style="display:none;">
-      <button onclick="loadMannequins()">マネキン一覧を取得</button>
-      <div id="mannequinStatus" class="status"></div>
-      <div id="mannequinGrid" class="item-grid"></div>
-    </div>
-  </section>
-
-  <!-- Step 2: 衣服 -->
-  <section>
-    <h2>Step 2: 衣服を選択（トップス・ボトムスのどちらか、または両方）</h2>
-    <button onclick="loadGarments()">衣服一覧を取得</button>
-    <div class="garment-cols" id="garmentCols" style="display:none;">
-      <div class="garment-col">
-        <h3>トップス</h3>
-        <div id="topsGrid" class="item-grid"></div>
-        <div class="selected-info" id="topInfo">未選択</div>
+    <!-- Step 1: Person -->
+    <div class="card">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">人物を選択</div>
+        <div class="step-sub" id="personStepSub"></div>
       </div>
-      <div class="garment-col">
-        <h3>ボトムス</h3>
-        <div id="bottomsGrid" class="item-grid"></div>
-        <div class="selected-info" id="bottomInfo">未選択</div>
+
+      <div class="tabs">
+        <div class="tab active" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
+        <div class="tab" id="tabUpload" onclick="switchTab('upload')">写真をアップロード</div>
+      </div>
+
+      <!-- マネキン -->
+      <div id="panelMannequin">
+        <div id="mannequinGrid" class="item-grid">
+          <!-- skeleton -->
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+        </div>
+        <div class="status-msg" id="mannequinStatus"></div>
+      </div>
+
+      <!-- アップロード -->
+      <div id="panelUpload" style="display:none;">
+        <div class="upload-area" id="uploadArea">
+          <input type="file" id="personFile" accept="image/jpeg,image/png" onchange="handleFileChange()">
+          <div class="upload-icon">📷</div>
+          <p><strong>クリックして画像を選択</strong></p>
+          <p>JPG / PNG（全身写真推奨）</p>
+        </div>
+        <button class="btn-upload" id="btnUpload" onclick="uploadPerson()" style="display:none;">アップロード</button>
+        <div class="status-msg" id="uploadStatus"></div>
+      </div>
+
+      <!-- 人物選択済みプレビュー -->
+      <div class="person-preview" id="personPreview" style="display:none;">
+        <img id="personThumb" src="" alt="person">
+        <div class="pinfo">
+          <div class="pname" id="personName">—</div>
+          <div class="psub">選択済み</div>
+        </div>
+        <button class="pchange" onclick="clearPerson()">変更</button>
       </div>
     </div>
-  </section>
 
-  <!-- Step 3: 試着 -->
-  <section>
-    <h2>Step 3: 試着する</h2>
-    <button onclick="runTryOn()" id="tryonBtn" disabled>試着する</button>
-    <div class="status" id="tryonStatus"></div>
-    <img id="resultImage" style="display:none; max-height:500px;">
-  </section>
+    <!-- Step 2: Garments -->
+    <div class="card">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">衣服を選択</div>
+        <div class="step-sub">どちらか一方、または両方を選択</div>
+      </div>
+      <div class="garment-cols">
+        <div>
+          <div class="garment-col-title">
+            <span class="dot dot-top"></span> トップス
+          </div>
+          <div id="topsGrid" class="item-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+          <div class="selected-hint" id="topHint"></div>
+        </div>
+        <div>
+          <div class="garment-col-title">
+            <span class="dot dot-bottom"></span> ボトムス
+          </div>
+          <div id="bottomsGrid" class="item-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+          <div class="selected-hint" id="bottomHint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <script>
-    let personGcsUri = null;
-    let topGcsUri    = null;
-    let bottomGcsUri = null;
+  <!-- ===== RIGHT COL ===== -->
+  <div class="right-col">
 
-    // ---- タブ切替 ----
-    function switchTab(tab) {
-      document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
-      document.getElementById('tabMannequin').classList.toggle('active', tab === 'mannequin');
-      document.getElementById('panelUpload').style.display    = tab === 'upload'    ? '' : 'none';
-      document.getElementById('panelMannequin').style.display = tab === 'mannequin' ? '' : 'none';
-      personGcsUri = null;
-      document.getElementById('personPreview').style.display = 'none';
-      document.getElementById('mannequinGrid').innerHTML = '';
-      updateTryonBtn();
+    <!-- Selection summary -->
+    <div class="card">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">試着する</div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-row">
+        <img id="sumPersonThumb" class="sthumb" src="" alt="" style="opacity:0">
+        <div>
+          <div class="summary-label">人物</div>
+          <div id="sumPersonName" class="summary-none">未選択</div>
+        </div>
+      </div>
+      <div class="summary-row">
+        <img id="sumTopThumb" class="sthumb square" src="" alt="" style="opacity:0">
+        <div>
+          <div class="summary-label">トップス</div>
+          <div id="sumTopName" class="summary-none">未選択</div>
+        </div>
+      </div>
+      <div class="summary-row" style="margin-bottom:16px;">
+        <img id="sumBottomThumb" class="sthumb square" src="" alt="" style="opacity:0">
+        <div>
+          <div class="summary-label">ボトムス</div>
+          <div id="sumBottomName" class="summary-none">未選択</div>
+        </div>
+      </div>
+
+      <button class="btn-tryon" id="tryonBtn" onclick="runTryOn()" disabled>
+        試着する
+      </button>
+      <div class="spinner" id="spinner"></div>
+      <div class="status-msg" id="tryonStatus" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- Result -->
+    <div class="card">
+      <div class="step-header" style="margin-bottom:12px;">
+        <div class="step-title">試着結果</div>
+      </div>
+      <div class="result-wrap" id="resultWrap">
+        <div class="result-placeholder">
+          <div class="ri">✨</div>
+          <p>試着結果がここに表示されます</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ===== State =====
+  let personGcsUri   = null;
+  let personImageUrl = null;
+  let personLabel    = null;
+  let topGcsUri      = null;
+  let topImageUrl    = null;
+  let topLabel       = null;
+  let bottomGcsUri   = null;
+  let bottomImageUrl = null;
+  let bottomLabel    = null;
+
+  // ===== Init =====
+  document.addEventListener('DOMContentLoaded', () => {
+    switchTab('mannequin');
+    loadMannequins();
+    loadGarments();
+  });
+
+  // ===== Tab =====
+  function switchTab(tab) {
+    document.getElementById('tabMannequin').classList.toggle('active', tab === 'mannequin');
+    document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
+    document.getElementById('panelMannequin').style.display = tab === 'mannequin' ? '' : 'none';
+    document.getElementById('panelUpload').style.display    = tab === 'upload'    ? '' : 'none';
+    if (tab !== 'upload') clearUploadPanel();
+    if (tab !== 'mannequin') {
+      document.querySelectorAll('#mannequinGrid .item-card').forEach(c => c.classList.remove('selected'));
     }
+    clearPerson();
+  }
 
-    // ---- アップロード ----
-    async function uploadPerson() {
-      const file = document.getElementById('personFile').files[0];
-      if (!file) { alert('ファイルを選択してください'); return; }
-      const status = document.getElementById('uploadStatus');
-      status.textContent = 'アップロード中...';
-      status.className = 'status';
-      const form = new FormData();
-      form.append('file', file);
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
-        const data = await res.json();
-        personGcsUri = data.gcs_uri;
-        status.textContent = `完了: ${data.gcs_uri}`;
-        const img = document.getElementById('personPreview');
-        img.src = data.image_url;
-        img.style.display = 'block';
-        updateTryonBtn();
-      } catch (e) {
-        status.textContent = `エラー: ${e.message}`;
-        status.className = 'status error';
-      }
+  function clearUploadPanel() {
+    document.getElementById('personFile').value = '';
+    document.getElementById('uploadStatus').textContent = '';
+    document.getElementById('btnUpload').style.display = 'none';
+  }
+
+  function clearPerson() {
+    personGcsUri = personImageUrl = personLabel = null;
+    document.getElementById('personPreview').style.display = 'none';
+    updateSummary();
+    updateTryonBtn();
+  }
+
+  // ===== Upload =====
+  function handleFileChange() {
+    const file = document.getElementById('personFile').files[0];
+    document.getElementById('btnUpload').style.display = file ? '' : 'none';
+    if (file) {
+      document.getElementById('uploadArea').querySelector('p').textContent = file.name;
     }
+  }
 
-    // ---- マネキン ----
-    async function loadMannequins() {
-      const status = document.getElementById('mannequinStatus');
-      status.textContent = '取得中...';
-      try {
-        const res = await fetch('/api/mannequins');
-        if (!res.ok) throw new Error(await res.text());
-        const items = await res.json();
-        status.textContent = '';
-        const grid = document.getElementById('mannequinGrid');
-        grid.innerHTML = '';
-        if (!items.length) { status.textContent = 'マネキン画像がありません'; return; }
-        items.forEach(m => {
-          const label = m.gender === 'female' ? '女性' : '男性';
-          const badgeClass = m.gender === 'female' ? 'badge-female' : 'badge-male';
-          const card = makeCard(m.gcs_uri, m.image_url, m.name, label, badgeClass);
-          card.onclick = () => {
-            document.querySelectorAll('#mannequinGrid .item-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            personGcsUri = m.gcs_uri;
-            updateTryonBtn();
-          };
-          grid.appendChild(card);
-        });
-      } catch (e) {
-        status.textContent = `エラー: ${e.message}`;
-        status.className = 'status error';
-      }
+  async function uploadPerson() {
+    const file = document.getElementById('personFile').files[0];
+    if (!file) return;
+    const status = document.getElementById('uploadStatus');
+    const btn = document.getElementById('btnUpload');
+    status.textContent = 'アップロード中...';
+    status.className = 'status-msg';
+    btn.disabled = true;
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      const data = await res.json();
+      setPerson(data.gcs_uri, data.image_url, file.name.replace(/\.[^.]+$/, ''));
+      status.textContent = '';
+    } catch (e) {
+      status.textContent = `エラー: ${e.message}`;
+      status.className = 'status-msg error';
+    } finally {
+      btn.disabled = false;
     }
+  }
 
-    // ---- 衣服 ----
-    async function loadGarments() {
-      const [topsRes, bottomsRes] = await Promise.all([
-        fetch('/api/garments?category=tops'),
-        fetch('/api/garments?category=bottoms'),
-      ]);
-      const tops    = await topsRes.json();
-      const bottoms = await bottomsRes.json();
-
-      renderGarmentGrid('topsGrid',    tops,    'topGcsUri',    'topInfo');
-      renderGarmentGrid('bottomsGrid', bottoms, 'bottomGcsUri', 'bottomInfo');
-      document.getElementById('garmentCols').style.display = '';
-    }
-
-    function renderGarmentGrid(gridId, items, uriVar, infoId) {
-      const grid = document.getElementById(gridId);
+  // ===== Mannequins =====
+  async function loadMannequins() {
+    try {
+      const res = await fetch('/api/mannequins');
+      if (!res.ok) throw new Error(await res.text());
+      const items = await res.json();
+      const grid = document.getElementById('mannequinGrid');
       grid.innerHTML = '';
-      items.forEach(g => {
-        const label = g.name.replace(/^(tops|bottoms)\//, '').replace('.png', '');
-        const card = makeCard(g.gcs_uri, g.image_url, label);
+      if (!items.length) {
+        grid.innerHTML = '<p style="color:#94a3b8;font-size:.8rem;">マネキン画像がありません</p>';
+        return;
+      }
+      items.forEach(m => {
+        const label = m.gender === 'female' ? '女性' : '男性';
+        const bClass = m.gender === 'female' ? 'badge-female' : 'badge-male';
+        const card = makeCard({
+          uri: m.gcs_uri, imageUrl: m.image_url, label: m.name,
+          badge: label, badgeClass: bClass,
+        });
         card.onclick = () => {
-          grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+          document.querySelectorAll('#mannequinGrid .item-card').forEach(c => c.classList.remove('selected'));
           card.classList.add('selected');
-          if (uriVar === 'topGcsUri')    { topGcsUri    = g.gcs_uri; }
-          if (uriVar === 'bottomGcsUri') { bottomGcsUri = g.gcs_uri; }
-          document.getElementById(infoId).textContent = label;
-          updateTryonBtn();
+          setPerson(m.gcs_uri, m.image_url, `${label}マネキン`);
         };
         grid.appendChild(card);
       });
+    } catch (e) {
+      document.getElementById('mannequinStatus').textContent = `取得失敗: ${e.message}`;
     }
+  }
 
-    // ---- カード生成ヘルパー ----
-    function makeCard(uri, imageUrl, label, badgeText, badgeClass) {
-      const card = document.createElement('div');
-      card.className = 'item-card';
-      card.dataset.uri = uri;
-      const badge = badgeText
-        ? `<span class="badge ${badgeClass}">${badgeText}</span><br>`
-        : '';
-      card.innerHTML = `${badge}<img src="${imageUrl}" alt="${label}"><div>${label}</div>`;
-      return card;
+  // ===== Garments =====
+  async function loadGarments() {
+    const [topsRes, bottomsRes] = await Promise.all([
+      fetch('/api/garments?category=tops'),
+      fetch('/api/garments?category=bottoms'),
+    ]);
+    const tops    = topsRes.ok    ? await topsRes.json()    : [];
+    const bottoms = bottomsRes.ok ? await bottomsRes.json() : [];
+    renderGarmentGrid('topsGrid',    tops,    'top');
+    renderGarmentGrid('bottomsGrid', bottoms, 'bottom');
+  }
+
+  function renderGarmentGrid(gridId, items, kind) {
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = '';
+    if (!items.length) {
+      grid.innerHTML = '<p style="color:#94a3b8;font-size:.8rem;">画像がありません</p>';
+      return;
     }
+    items.forEach(g => {
+      const displayLabel = g.name.replace(/^(tops|bottoms)\//, '').replace(/\.png$/, '');
+      const card = makeCard({ uri: g.gcs_uri, imageUrl: g.image_url, label: displayLabel, square: true });
+      card.onclick = () => {
+        grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        if (kind === 'top') {
+          topGcsUri = g.gcs_uri; topImageUrl = g.image_url; topLabel = displayLabel;
+          document.getElementById('topHint').textContent = `✓ ${displayLabel}`;
+        } else {
+          bottomGcsUri = g.gcs_uri; bottomImageUrl = g.image_url; bottomLabel = displayLabel;
+          document.getElementById('bottomHint').textContent = `✓ ${displayLabel}`;
+        }
+        updateSummary();
+        updateTryonBtn();
+      };
+      grid.appendChild(card);
+    });
+  }
 
-    function updateTryonBtn() {
-      const hasGarment = topGcsUri || bottomGcsUri;
-      document.getElementById('tryonBtn').disabled = !(personGcsUri && hasGarment);
+  // ===== Helpers =====
+  function makeCard({ uri, imageUrl, label, badge, badgeClass, square }) {
+    const card = document.createElement('div');
+    card.className = 'item-card' + (square ? ' square' : '');
+    card.dataset.uri = uri;
+    card.innerHTML = `
+      <img class="thumb" src="${imageUrl}" alt="${label}" loading="lazy">
+      ${badge ? `<span class="badge ${badgeClass}">${badge}</span>` : ''}
+      <div class="check">✓</div>
+      <div class="label">${label}</div>`;
+    return card;
+  }
+
+  function setPerson(uri, imageUrl, label) {
+    personGcsUri = uri; personImageUrl = imageUrl; personLabel = label;
+    const prev = document.getElementById('personPreview');
+    document.getElementById('personThumb').src = imageUrl;
+    document.getElementById('personName').textContent = label;
+    prev.style.display = 'flex';
+    document.getElementById('personStepSub').textContent = `✓ ${label}`;
+    updateSummary();
+    updateTryonBtn();
+  }
+
+  function updateSummary() {
+    setSummaryItem('Person', personImageUrl, personLabel, false);
+    setSummaryItem('Top',    topImageUrl,    topLabel,    true);
+    setSummaryItem('Bottom', bottomImageUrl, bottomLabel, true);
+  }
+
+  function setSummaryItem(key, imageUrl, label, square) {
+    const thumb = document.getElementById(`sum${key}Thumb`);
+    const name  = document.getElementById(`sum${key}Name`);
+    if (imageUrl) {
+      thumb.src = imageUrl;
+      thumb.style.opacity = '1';
+      name.textContent = label;
+      name.className = 'summary-name';
+    } else {
+      thumb.src = ''; thumb.style.opacity = '0';
+      name.textContent = '未選択';
+      name.className = 'summary-none';
     }
+  }
 
-    // ---- 試着 ----
-    async function runTryOn() {
-      const status = document.getElementById('tryonStatus');
-      const both = topGcsUri && bottomGcsUri;
-      status.textContent = both
-        ? '試着処理中... トップス→ボトムスの順に2回処理します（最大2分程度）'
-        : '試着処理中... (最大1分程度かかります)';
-      status.className = 'status';
-      document.getElementById('tryonBtn').disabled = true;
-      document.getElementById('resultImage').style.display = 'none';
-      try {
-        const body = { person_gcs_uri: personGcsUri };
-        if (topGcsUri)    body.top_gcs_uri    = topGcsUri;
-        if (bottomGcsUri) body.bottom_gcs_uri = bottomGcsUri;
+  function updateTryonBtn() {
+    const ok = personGcsUri && (topGcsUri || bottomGcsUri);
+    document.getElementById('tryonBtn').disabled = !ok;
+  }
 
-        const res = await fetch('/api/tryon', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
-        const data = await res.json();
-        status.textContent = `完了: ${data.result_gcs_uri}`;
-        const img = document.getElementById('resultImage');
-        img.src = data.result_url;
-        img.style.display = 'block';
-      } catch (e) {
-        status.textContent = `エラー: ${e.message}`;
-        status.className = 'status error';
-      } finally {
-        document.getElementById('tryonBtn').disabled = false;
-      }
+  // ===== Try-On =====
+  async function runTryOn() {
+    const both = topGcsUri && bottomGcsUri;
+    const status = document.getElementById('tryonStatus');
+    const spinner = document.getElementById('spinner');
+    const btn = document.getElementById('tryonBtn');
+    status.textContent = both ? 'トップス→ボトムスの順に処理中... (最大2分)' : '試着処理中... (最大1分)';
+    status.className = 'status-msg';
+    spinner.classList.add('visible');
+    btn.disabled = true;
+
+    document.getElementById('resultWrap').innerHTML = `
+      <div style="width:100%;padding:24px;">
+        <div class="skeleton" style="height:360px;border-radius:8px;"></div>
+      </div>`;
+
+    try {
+      const body = { person_gcs_uri: personGcsUri };
+      if (topGcsUri)    body.top_gcs_uri    = topGcsUri;
+      if (bottomGcsUri) body.bottom_gcs_uri = bottomGcsUri;
+
+      const res = await fetch('/api/tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      const data = await res.json();
+
+      document.getElementById('resultWrap').innerHTML =
+        `<img class="result-img" src="${data.result_url}" alt="試着結果">`;
+      status.textContent = '完了';
+    } catch (e) {
+      status.textContent = `エラー: ${e.message}`;
+      status.className = 'status-msg error';
+      document.getElementById('resultWrap').innerHTML = `
+        <div class="result-placeholder">
+          <div class="ri">⚠️</div>
+          <p>${e.message}</p>
+        </div>`;
+    } finally {
+      spinner.classList.remove('visible');
+      updateTryonBtn();
     }
-  </script>
+  }
+</script>
 </body>
 </html>
