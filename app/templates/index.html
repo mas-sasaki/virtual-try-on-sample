@@ -216,7 +216,10 @@
     // ---- 試着 ----
     async function runTryOn() {
       const status = document.getElementById('tryonStatus');
-      status.textContent = '試着処理中... (最大1分程度かかります)';
+      const both = topGcsUri && bottomGcsUri;
+      status.textContent = both
+        ? '試着処理中... トップス→ボトムスの順に2回処理します（最大2分程度）'
+        : '試着処理中... (最大1分程度かかります)';
       status.className = 'status';
       document.getElementById('tryonBtn').disabled = true;
       document.getElementById('resultImage').style.display = 'none';

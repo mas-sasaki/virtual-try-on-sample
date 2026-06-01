@@ -23,13 +23,13 @@ class TryOnRequest(BaseModel):
 def try_on(req: TryOnRequest):
     try:
         person_bytes = get_blob_bytes(req.person_gcs_uri)
-        garment_uris = [uri for uri in [req.top_gcs_uri, req.bottom_gcs_uri] if uri]
-        garment_bytes = [get_blob_bytes(uri) for uri in garment_uris]
+        top_bytes    = get_blob_bytes(req.top_gcs_uri)    if req.top_gcs_uri    else None
+        bottom_bytes = get_blob_bytes(req.bottom_gcs_uri) if req.bottom_gcs_uri else None
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"GCS から画像を取得できませんでした: {e}")
 
     try:
-        result_bytes = run_virtual_tryon(person_bytes, garment_bytes)
+        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Virtual Try-On API エラー: {e}")
 
