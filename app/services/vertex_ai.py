@@ -22,7 +22,7 @@ def _get_access_token() -> str:
 
 def run_virtual_tryon(
     person_image_bytes: bytes,
-    garment_image_bytes: bytes,
+    garment_images_bytes: list[bytes],
 ) -> bytes:
     url = _ENDPOINT_TEMPLATE.format(
         region=settings.vertex_ai_region,
@@ -39,9 +39,10 @@ def run_virtual_tryon(
                 "productImages": [
                     {
                         "image": {
-                            "bytesBase64Encoded": base64.b64encode(garment_image_bytes).decode()
+                            "bytesBase64Encoded": base64.b64encode(g).decode()
                         }
                     }
+                    for g in garment_images_bytes
                 ],
             }
         ],

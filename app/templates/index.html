@@ -4,14 +4,13 @@
   <meta charset="UTF-8">
   <title>Virtual Try-On API テスト</title>
   <style>
-    body { font-family: sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; }
+    body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
     h1 { font-size: 1.4rem; }
     section { margin: 24px 0; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
     h2 { font-size: 1rem; margin: 0 0 12px; }
     button { padding: 8px 16px; cursor: pointer; }
     button:disabled { opacity: 0.4; cursor: default; }
     img { max-width: 100%; margin-top: 12px; border: 1px solid #ccc; border-radius: 4px; }
-    select { width: 100%; padding: 6px; }
     .status { margin-top: 8px; font-size: 0.875rem; color: #555; }
     .error { color: #c00; }
 
@@ -20,27 +19,32 @@
     .tab { padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: #f5f5f5; }
     .tab.active { background: #333; color: #fff; border-color: #333; }
 
-    /* マネキングリッド */
-    .mannequin-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
-    .mannequin-card {
-      width: 120px; cursor: pointer; border: 2px solid #ddd; border-radius: 6px;
-      padding: 6px; text-align: center; font-size: 0.8rem;
+    /* マネキン・衣服グリッド共通 */
+    .item-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .item-card {
+      width: 110px; cursor: pointer; border: 2px solid #ddd; border-radius: 6px;
+      padding: 6px; text-align: center; font-size: 0.75rem;
     }
-    .mannequin-card.selected { border-color: #333; background: #f0f0f0; }
-    .mannequin-card img { width: 100%; height: 140px; object-fit: cover; border: none; margin: 0; }
+    .item-card.selected { border-color: #333; background: #f0f0f0; }
+    .item-card img { width: 100%; height: 120px; object-fit: cover; border: none; margin: 0 0 4px; border-radius: 3px; }
 
-    .gender-label {
+    .badge {
       display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 0.75rem; margin-bottom: 6px;
+      font-size: 0.7rem; margin-bottom: 4px;
     }
-    .gender-label.male { background: #dbeafe; color: #1e40af; }
-    .gender-label.female { background: #fce7f3; color: #9d174d; }
+    .badge-male   { background: #dbeafe; color: #1e40af; }
+    .badge-female { background: #fce7f3; color: #9d174d; }
+
+    /* 衣服2カラム */
+    .garment-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+    .garment-col h3 { font-size: 0.9rem; margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
+    .selected-info { font-size: 0.8rem; color: #555; margin-top: 6px; min-height: 1.2em; }
   </style>
 </head>
 <body>
   <h1>Virtual Try-On API テスト UI</h1>
 
-  <!-- Step 1 -->
+  <!-- Step 1: 人物 -->
   <section>
     <h2>Step 1: 人物を選択</h2>
     <div class="tabs">
@@ -48,33 +52,39 @@
       <div class="tab" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
     </div>
 
-    <!-- アップロードパネル -->
     <div id="panelUpload">
       <input type="file" id="personFile" accept="image/jpeg,image/png">
       <button onclick="uploadPerson()">アップロード</button>
       <div class="status" id="uploadStatus"></div>
-      <img id="personPreview" style="display:none; max-height:300px;">
+      <img id="personPreview" style="display:none; max-height:280px;">
     </div>
 
-    <!-- マネキン選択パネル -->
     <div id="panelMannequin" style="display:none;">
       <button onclick="loadMannequins()">マネキン一覧を取得</button>
       <div id="mannequinStatus" class="status"></div>
-      <div id="mannequinGrid" class="mannequin-grid"></div>
+      <div id="mannequinGrid" class="item-grid"></div>
     </div>
   </section>
 
-  <!-- Step 2 -->
+  <!-- Step 2: 衣服 -->
   <section>
-    <h2>Step 2: 衣服を選択</h2>
+    <h2>Step 2: 衣服を選択（トップス・ボトムスのどちらか、または両方）</h2>
     <button onclick="loadGarments()">衣服一覧を取得</button>
-    <div style="margin-top:12px;">
-      <select id="garmentSelect" size="6" style="display:none;"></select>
+    <div class="garment-cols" id="garmentCols" style="display:none;">
+      <div class="garment-col">
+        <h3>トップス</h3>
+        <div id="topsGrid" class="item-grid"></div>
+        <div class="selected-info" id="topInfo">未選択</div>
+      </div>
+      <div class="garment-col">
+        <h3>ボトムス</h3>
+        <div id="bottomsGrid" class="item-grid"></div>
+        <div class="selected-info" id="bottomInfo">未選択</div>
+      </div>
     </div>
-    <img id="garmentPreview" style="display:none; max-height:200px;">
   </section>
 
-  <!-- Step 3 -->
+  <!-- Step 3: 試着 -->
   <section>
     <h2>Step 3: 試着する</h2>
     <button onclick="runTryOn()" id="tryonBtn" disabled>試着する</button>
@@ -84,13 +94,14 @@
 
   <script>
     let personGcsUri = null;
-    let garmentGcsUri = null;
+    let topGcsUri    = null;
+    let bottomGcsUri = null;
 
     // ---- タブ切替 ----
     function switchTab(tab) {
       document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
       document.getElementById('tabMannequin').classList.toggle('active', tab === 'mannequin');
-      document.getElementById('panelUpload').style.display = tab === 'upload' ? '' : 'none';
+      document.getElementById('panelUpload').style.display    = tab === 'upload'    ? '' : 'none';
       document.getElementById('panelMannequin').style.display = tab === 'mannequin' ? '' : 'none';
       personGcsUri = null;
       document.getElementById('personPreview').style.display = 'none';
@@ -134,18 +145,17 @@
         status.textContent = '';
         const grid = document.getElementById('mannequinGrid');
         grid.innerHTML = '';
-        if (items.length === 0) { status.textContent = 'マネキン画像がありません'; return; }
+        if (!items.length) { status.textContent = 'マネキン画像がありません'; return; }
         items.forEach(m => {
-          const card = document.createElement('div');
-          card.className = 'mannequin-card';
-          card.dataset.uri = m.gcs_uri;
           const label = m.gender === 'female' ? '女性' : '男性';
-          const labelClass = m.gender === 'female' ? 'female' : 'male';
-          card.innerHTML = `
-            <span class="gender-label ${labelClass}">${label}</span>
-            <img src="${m.image_url}" alt="${m.name}">
-            <div>${m.name}</div>`;
-          card.onclick = () => selectMannequin(card, m.gcs_uri);
+          const badgeClass = m.gender === 'female' ? 'badge-female' : 'badge-male';
+          const card = makeCard(m.gcs_uri, m.image_url, m.name, label, badgeClass);
+          card.onclick = () => {
+            document.querySelectorAll('#mannequinGrid .item-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            personGcsUri = m.gcs_uri;
+            updateTryonBtn();
+          };
           grid.appendChild(card);
         });
       } catch (e) {
@@ -154,39 +164,53 @@
       }
     }
 
-    function selectMannequin(card, uri) {
-      document.querySelectorAll('.mannequin-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      personGcsUri = uri;
-      updateTryonBtn();
-    }
-
     // ---- 衣服 ----
     async function loadGarments() {
-      const res = await fetch('/api/garments');
-      const items = await res.json();
-      const sel = document.getElementById('garmentSelect');
-      sel.innerHTML = '';
+      const [topsRes, bottomsRes] = await Promise.all([
+        fetch('/api/garments?category=tops'),
+        fetch('/api/garments?category=bottoms'),
+      ]);
+      const tops    = await topsRes.json();
+      const bottoms = await bottomsRes.json();
+
+      renderGarmentGrid('topsGrid',    tops,    'topGcsUri',    'topInfo');
+      renderGarmentGrid('bottomsGrid', bottoms, 'bottomGcsUri', 'bottomInfo');
+      document.getElementById('garmentCols').style.display = '';
+    }
+
+    function renderGarmentGrid(gridId, items, uriVar, infoId) {
+      const grid = document.getElementById(gridId);
+      grid.innerHTML = '';
       items.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g.gcs_uri;
-        opt.textContent = g.name;
-        opt.dataset.url = g.image_url;
-        sel.appendChild(opt);
+        const label = g.name.replace(/^(tops|bottoms)\//, '').replace('.png', '');
+        const card = makeCard(g.gcs_uri, g.image_url, label);
+        card.onclick = () => {
+          grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          if (uriVar === 'topGcsUri')    { topGcsUri    = g.gcs_uri; }
+          if (uriVar === 'bottomGcsUri') { bottomGcsUri = g.gcs_uri; }
+          document.getElementById(infoId).textContent = label;
+          updateTryonBtn();
+        };
+        grid.appendChild(card);
       });
-      sel.style.display = 'block';
-      sel.onchange = () => {
-        const opt = sel.options[sel.selectedIndex];
-        garmentGcsUri = opt.value;
-        const img = document.getElementById('garmentPreview');
-        img.src = opt.dataset.url;
-        img.style.display = 'block';
-        updateTryonBtn();
-      };
+    }
+
+    // ---- カード生成ヘルパー ----
+    function makeCard(uri, imageUrl, label, badgeText, badgeClass) {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.dataset.uri = uri;
+      const badge = badgeText
+        ? `<span class="badge ${badgeClass}">${badgeText}</span><br>`
+        : '';
+      card.innerHTML = `${badge}<img src="${imageUrl}" alt="${label}"><div>${label}</div>`;
+      return card;
     }
 
     function updateTryonBtn() {
-      document.getElementById('tryonBtn').disabled = !(personGcsUri && garmentGcsUri);
+      const hasGarment = topGcsUri || bottomGcsUri;
+      document.getElementById('tryonBtn').disabled = !(personGcsUri && hasGarment);
     }
 
     // ---- 試着 ----
@@ -197,10 +221,14 @@
       document.getElementById('tryonBtn').disabled = true;
       document.getElementById('resultImage').style.display = 'none';
       try {
+        const body = { person_gcs_uri: personGcsUri };
+        if (topGcsUri)    body.top_gcs_uri    = topGcsUri;
+        if (bottomGcsUri) body.bottom_gcs_uri = bottomGcsUri;
+
         const res = await fetch('/api/tryon', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person_gcs_uri: personGcsUri, garment_gcs_uri: garmentGcsUri }),
+          body: JSON.stringify(body),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
         const data = await res.json();
