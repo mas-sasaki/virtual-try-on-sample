@@ -147,16 +147,13 @@
       border-radius: var(--radius-sm);
       overflow: hidden;
       cursor: pointer;
-      transition: border-color .15s, transform .1s, box-shadow .15s;
+      transition: border-color .15s, transform .1s, box-shadow .15s, opacity .2s;
       position: relative;
       background: var(--surface-2);
     }
     .item-card:hover { border-color: #a5b4fc; transform: translateY(-1px); box-shadow: var(--shadow-md); }
     .item-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px #e0e7ff; }
-    .item-card.selected .check {
-      opacity: 1;
-      transform: scale(1);
-    }
+    .item-card.selected .check { opacity: 1; transform: scale(1); }
 
     .item-card .thumb {
       width: 100%;
@@ -202,6 +199,16 @@
     .badge-male   { background: var(--male-bg);   color: var(--male-fg); }
     .badge-female { background: var(--female-bg); color: var(--female-fg); }
 
+    /* ---- Garment locked state ---- */
+    .garments-locked .item-card {
+      pointer-events: none;
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .garments-locked .item-card.selected {
+      opacity: 0.8;
+    }
+
     /* ---- Garment two-col ---- */
     .garment-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .garment-col-title {
@@ -221,7 +228,6 @@
     }
     .dot-top    { background: #818cf8; }
     .dot-bottom { background: #34d399; }
-    .selected-hint { font-size: 0.72rem; color: var(--primary); margin-top: 6px; min-height: 1em; }
 
     /* ---- Upload area ---- */
     .upload-area {
@@ -278,48 +284,24 @@
       padding: 4px 8px;
     }
 
-    /* ---- Right panel ---- */
-    .summary-row {
+    /* ---- Applied chips ---- */
+    .applied-chips {
       display: flex;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .applied-chip {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      display: inline-flex;
       align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
+      gap: 4px;
     }
-    .summary-row:last-of-type { border-bottom: none; }
-    .summary-row .sthumb {
-      width: 40px; height: 50px;
-      border-radius: 6px;
-      object-fit: cover;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .summary-row .sthumb.square { height: 40px; }
-    .summary-label { font-size: 0.75rem; color: var(--text-muted); }
-    .summary-name  { font-size: 0.8rem; font-weight: 500; }
-    .summary-none  { font-size: 0.8rem; color: #cbd5e1; font-style: italic; }
-
-    .btn-tryon {
-      width: 100%;
-      padding: 14px;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background .15s, transform .1s, box-shadow .15s;
-      letter-spacing: .01em;
-    }
-    .btn-tryon:hover:not(:disabled) {
-      background: var(--primary-h);
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-md);
-    }
-    .btn-tryon:active:not(:disabled) { transform: translateY(0); }
-    .btn-tryon:disabled { background: #c7d2fe; cursor: not-allowed; }
+    .chip-top    { background: #ede9fe; color: var(--primary); }
+    .chip-bottom { background: #d1fae5; color: #065f46; }
 
     /* ---- Status / loading ---- */
     .status-msg {
@@ -329,6 +311,17 @@
       min-height: 1.2em;
     }
     .status-msg.error { color: #ef4444; }
+
+    .notice-msg {
+      font-size: 0.8rem;
+      color: #b45309;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
 
     .spinner {
       display: none;
@@ -378,6 +371,30 @@
       gap: 10px;
     }
     .loading-grid .skeleton-card { border-radius: var(--radius-sm); }
+
+    /* ---- Reset button ---- */
+    .btn-reset {
+      margin-top: 12px;
+      width: 100%;
+      padding: 9px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .btn-reset:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+    /* ---- Hint below step 2 grids ---- */
+    .chain-hint {
+      font-size: 0.75rem;
+      color: var(--primary);
+      margin-top: 10px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -409,7 +426,6 @@
       <!-- マネキン -->
       <div id="panelMannequin">
         <div id="mannequinGrid" class="item-grid">
-          <!-- skeleton -->
           <div class="skeleton skeleton-card"></div>
           <div class="skeleton skeleton-card"></div>
           <div class="skeleton skeleton-card"></div>
@@ -446,101 +462,78 @@
       <div class="step-header">
         <div class="step-num">2</div>
         <div class="step-title">衣服を選択</div>
-        <div class="step-sub">どちらか一方、または両方を選択</div>
+        <div class="step-sub">選ぶと自動で試着します</div>
       </div>
-      <div class="garment-cols">
-        <div>
-          <div class="garment-col-title">
-            <span class="dot dot-top"></span> トップス
+
+      <!-- 人物未選択の警告 -->
+      <div class="notice-msg" id="garmentNoPerson">先に人物を選択してください</div>
+
+      <div id="garmentSection">
+        <div class="garment-cols">
+          <div>
+            <div class="garment-col-title">
+              <span class="dot dot-top"></span> トップス
+            </div>
+            <div id="topsGrid" class="item-grid">
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+            </div>
           </div>
-          <div id="topsGrid" class="item-grid">
-            <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-card"></div>
+          <div>
+            <div class="garment-col-title">
+              <span class="dot dot-bottom"></span> ボトムス
+            </div>
+            <div id="bottomsGrid" class="item-grid">
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+              <div class="skeleton skeleton-card"></div>
+            </div>
           </div>
-          <div class="selected-hint" id="topHint"></div>
         </div>
-        <div>
-          <div class="garment-col-title">
-            <span class="dot dot-bottom"></span> ボトムス
-          </div>
-          <div id="bottomsGrid" class="item-grid">
-            <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-card"></div>
-            <div class="skeleton skeleton-card"></div>
-          </div>
-          <div class="selected-hint" id="bottomHint"></div>
-        </div>
+        <div class="chain-hint" id="chainHint">✨ 試着結果に重ねて選択できます</div>
       </div>
     </div>
   </div>
 
   <!-- ===== RIGHT COL ===== -->
   <div class="right-col">
-
-    <!-- Selection summary -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-num">3</div>
-        <div class="step-title">試着する</div>
-      </div>
-
-      <!-- Summary -->
-      <div class="summary-row">
-        <img id="sumPersonThumb" class="sthumb" src="" alt="" style="opacity:0">
-        <div>
-          <div class="summary-label">人物</div>
-          <div id="sumPersonName" class="summary-none">未選択</div>
-        </div>
-      </div>
-      <div class="summary-row">
-        <img id="sumTopThumb" class="sthumb square" src="" alt="" style="opacity:0">
-        <div>
-          <div class="summary-label">トップス</div>
-          <div id="sumTopName" class="summary-none">未選択</div>
-        </div>
-      </div>
-      <div class="summary-row" style="margin-bottom:16px;">
-        <img id="sumBottomThumb" class="sthumb square" src="" alt="" style="opacity:0">
-        <div>
-          <div class="summary-label">ボトムス</div>
-          <div id="sumBottomName" class="summary-none">未選択</div>
-        </div>
-      </div>
-
-      <button class="btn-tryon" id="tryonBtn" onclick="runTryOn()" disabled>
-        試着する
-      </button>
-      <div class="spinner" id="spinner"></div>
-      <div class="status-msg" id="tryonStatus" style="margin-top:8px;"></div>
-    </div>
-
-    <!-- Result -->
     <div class="card">
       <div class="step-header" style="margin-bottom:12px;">
         <div class="step-title">試着結果</div>
       </div>
+
+      <!-- Applied chips -->
+      <div class="applied-chips" id="appliedChips" style="display:none;"></div>
+
+      <!-- Spinner + status -->
+      <div class="spinner" id="spinner"></div>
+      <div class="status-msg" id="tryonStatus" style="margin-bottom:8px;"></div>
+
+      <!-- Result image -->
       <div class="result-wrap" id="resultWrap">
         <div class="result-placeholder">
           <div class="ri">✨</div>
-          <p>試着結果がここに表示されます</p>
+          <p>衣服を選ぶと自動で試着します</p>
         </div>
       </div>
+
+      <!-- Reset -->
+      <button class="btn-reset" id="btnReset" onclick="resetTryon()" style="display:none;">
+        ↺ 最初からやり直す
+      </button>
     </div>
   </div>
 </main>
 
 <script>
   // ===== State =====
-  let personGcsUri   = null;
-  let personImageUrl = null;
-  let personLabel    = null;
-  let topGcsUri      = null;
-  let topImageUrl    = null;
-  let topLabel       = null;
-  let bottomGcsUri   = null;
-  let bottomImageUrl = null;
-  let bottomLabel    = null;
+  let personGcsUri         = null; // current person (updates to result after each try-on)
+  let originalPersonGcsUri = null; // original selection (for reset)
+  let originalPersonImgUrl = null;
+  let originalPersonLabel  = null;
+  let isTryingOn           = false;
+  let appliedGarments      = []; // [{label, kind}]
 
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', () => {
@@ -569,19 +562,17 @@
   }
 
   function clearPerson() {
-    personGcsUri = personImageUrl = personLabel = null;
+    personGcsUri = originalPersonGcsUri = originalPersonImgUrl = originalPersonLabel = null;
     document.getElementById('personPreview').style.display = 'none';
-    updateSummary();
-    updateTryonBtn();
+    document.getElementById('personStepSub').textContent = '';
+    resetTryonState(/* clearResult= */ true);
   }
 
   // ===== Upload =====
   function handleFileChange() {
     const file = document.getElementById('personFile').files[0];
     document.getElementById('btnUpload').style.display = file ? '' : 'none';
-    if (file) {
-      document.getElementById('uploadArea').querySelector('p').textContent = file.name;
-    }
+    if (file) document.getElementById('uploadArea').querySelectorAll('p')[0].textContent = file.name;
   }
 
   async function uploadPerson() {
@@ -623,10 +614,7 @@
       items.forEach(m => {
         const label = m.gender === 'female' ? '女性' : '男性';
         const bClass = m.gender === 'female' ? 'badge-female' : 'badge-male';
-        const card = makeCard({
-          uri: m.gcs_uri, imageUrl: m.image_url, label: m.name,
-          badge: label, badgeClass: bClass,
-        });
+        const card = makeCard({ imageUrl: m.image_url, label: m.name, badge: label, badgeClass: bClass });
         card.onclick = () => {
           document.querySelectorAll('#mannequinGrid .item-card').forEach(c => c.classList.remove('selected'));
           card.classList.add('selected');
@@ -660,29 +648,27 @@
     }
     items.forEach(g => {
       const displayLabel = g.name.replace(/^(tops|bottoms)\//, '').replace(/\.png$/, '');
-      const card = makeCard({ uri: g.gcs_uri, imageUrl: g.image_url, label: displayLabel, square: true });
-      card.onclick = () => {
-        grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        if (kind === 'top') {
-          topGcsUri = g.gcs_uri; topImageUrl = g.image_url; topLabel = displayLabel;
-          document.getElementById('topHint').textContent = `✓ ${displayLabel}`;
-        } else {
-          bottomGcsUri = g.gcs_uri; bottomImageUrl = g.image_url; bottomLabel = displayLabel;
-          document.getElementById('bottomHint').textContent = `✓ ${displayLabel}`;
-        }
-        updateSummary();
-        updateTryonBtn();
-      };
+      const card = makeCard({ imageUrl: g.image_url, label: displayLabel, square: true });
+      card.onclick = () => garmentClicked(card, grid, g.gcs_uri, displayLabel, kind);
       grid.appendChild(card);
     });
   }
 
+  function garmentClicked(card, grid, gcsUri, label, kind) {
+    if (isTryingOn) return;
+    if (!originalPersonGcsUri) {
+      showNoPersonHint();
+      return;
+    }
+    grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    runTryOn(gcsUri, label, kind);
+  }
+
   // ===== Helpers =====
-  function makeCard({ uri, imageUrl, label, badge, badgeClass, square }) {
+  function makeCard({ imageUrl, label, badge, badgeClass, square }) {
     const card = document.createElement('div');
     card.className = 'item-card' + (square ? ' square' : '');
-    card.dataset.uri = uri;
     card.innerHTML = `
       <img class="thumb" src="${imageUrl}" alt="${label}" loading="lazy">
       ${badge ? `<span class="badge ${badgeClass}">${badge}</span>` : ''}
@@ -692,52 +678,83 @@
   }
 
   function setPerson(uri, imageUrl, label) {
-    personGcsUri = uri; personImageUrl = imageUrl; personLabel = label;
-    const prev = document.getElementById('personPreview');
+    personGcsUri = uri;
+    originalPersonGcsUri = uri;
+    originalPersonImgUrl = imageUrl;
+    originalPersonLabel  = label;
     document.getElementById('personThumb').src = imageUrl;
     document.getElementById('personName').textContent = label;
-    prev.style.display = 'flex';
+    document.getElementById('personPreview').style.display = 'flex';
     document.getElementById('personStepSub').textContent = `✓ ${label}`;
-    updateSummary();
-    updateTryonBtn();
+    resetTryonState(/* clearResult= */ true);
   }
 
-  function updateSummary() {
-    setSummaryItem('Person', personImageUrl, personLabel, false);
-    setSummaryItem('Top',    topImageUrl,    topLabel,    true);
-    setSummaryItem('Bottom', bottomImageUrl, bottomLabel, true);
+  function showNoPersonHint() {
+    const el = document.getElementById('garmentNoPerson');
+    el.style.display = '';
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.style.display = 'none'; }, 2500);
   }
 
-  function setSummaryItem(key, imageUrl, label, square) {
-    const thumb = document.getElementById(`sum${key}Thumb`);
-    const name  = document.getElementById(`sum${key}Name`);
-    if (imageUrl) {
-      thumb.src = imageUrl;
-      thumb.style.opacity = '1';
-      name.textContent = label;
-      name.className = 'summary-name';
-    } else {
-      thumb.src = ''; thumb.style.opacity = '0';
-      name.textContent = '未選択';
-      name.className = 'summary-none';
+  // ===== Garment lock/unlock =====
+  function lockGarments() {
+    isTryingOn = true;
+    document.getElementById('garmentSection').classList.add('garments-locked');
+  }
+
+  function unlockGarments() {
+    isTryingOn = false;
+    document.getElementById('garmentSection').classList.remove('garments-locked');
+  }
+
+  function clearGarmentSelection() {
+    document.querySelectorAll('#topsGrid .item-card, #bottomsGrid .item-card')
+      .forEach(c => c.classList.remove('selected'));
+  }
+
+  // ===== Reset =====
+  function resetTryonState(clearResult) {
+    appliedGarments = [];
+    personGcsUri = originalPersonGcsUri; // restore base
+    clearGarmentSelection();
+    document.getElementById('appliedChips').innerHTML = '';
+    document.getElementById('appliedChips').style.display = 'none';
+    document.getElementById('chainHint').style.display = 'none';
+    document.getElementById('btnReset').style.display = 'none';
+    document.getElementById('tryonStatus').textContent = '';
+    document.getElementById('tryonStatus').className = 'status-msg';
+    if (clearResult) {
+      document.getElementById('resultWrap').innerHTML = `
+        <div class="result-placeholder">
+          <div class="ri">✨</div>
+          <p>衣服を選ぶと自動で試着します</p>
+        </div>`;
     }
   }
 
-  function updateTryonBtn() {
-    const ok = personGcsUri && (topGcsUri || bottomGcsUri);
-    document.getElementById('tryonBtn').disabled = !ok;
+  function resetTryon() {
+    if (!originalPersonGcsUri) return;
+    resetTryonState(/* clearResult= */ true);
+  }
+
+  // ===== Applied chips =====
+  function updateAppliedChips() {
+    const el = document.getElementById('appliedChips');
+    el.innerHTML = appliedGarments.map(g =>
+      `<span class="applied-chip chip-${g.kind}">${g.kind === 'top' ? 'トップス' : 'ボトムス'}: ${g.label}</span>`
+    ).join('');
+    el.style.display = appliedGarments.length ? '' : 'none';
   }
 
   // ===== Try-On =====
-  async function runTryOn() {
-    const both = topGcsUri && bottomGcsUri;
-    const status = document.getElementById('tryonStatus');
+  async function runTryOn(garmentGcsUri, garmentLabel, kind) {
+    lockGarments();
+
+    const status  = document.getElementById('tryonStatus');
     const spinner = document.getElementById('spinner');
-    const btn = document.getElementById('tryonBtn');
-    status.textContent = both ? 'トップス→ボトムスの順に処理中... (最大2分)' : '試着処理中... (最大1分)';
+    status.textContent = '試着処理中... (最大1分)';
     status.className = 'status-msg';
     spinner.classList.add('visible');
-    btn.disabled = true;
 
     document.getElementById('resultWrap').innerHTML = `
       <div style="width:100%;padding:24px;">
@@ -746,8 +763,8 @@
 
     try {
       const body = { person_gcs_uri: personGcsUri };
-      if (topGcsUri)    body.top_gcs_uri    = topGcsUri;
-      if (bottomGcsUri) body.bottom_gcs_uri = bottomGcsUri;
+      if (kind === 'top')    body.top_gcs_uri    = garmentGcsUri;
+      else                   body.bottom_gcs_uri = garmentGcsUri;
 
       const res = await fetch('/api/tryon', {
         method: 'POST',
@@ -757,9 +774,18 @@
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
       const data = await res.json();
 
+      // Advance person → result for next chained try-on
+      personGcsUri = data.result_gcs_uri;
+      appliedGarments.push({ label: garmentLabel, kind });
+
       document.getElementById('resultWrap').innerHTML =
         `<img class="result-img" src="${data.result_url}" alt="試着結果">`;
-      status.textContent = '完了';
+
+      status.textContent = '完了 — 別の衣服を選ぶと重ねて試着できます';
+      updateAppliedChips();
+      document.getElementById('btnReset').style.display = '';
+      document.getElementById('chainHint').style.display = '';
+
     } catch (e) {
       status.textContent = `エラー: ${e.message}`;
       status.className = 'status-msg error';
@@ -770,7 +796,8 @@
         </div>`;
     } finally {
       spinner.classList.remove('visible');
-      updateTryonBtn();
+      unlockGarments();
+      clearGarmentSelection();
     }
   }
 </script>
