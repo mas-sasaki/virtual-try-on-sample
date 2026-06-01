@@ -25,7 +25,7 @@ def run_virtual_tryon(
     garment_image_bytes: bytes,
 ) -> bytes:
     url = _ENDPOINT_TEMPLATE.format(
-        region=settings.gcp_region,
+        region=settings.vertex_ai_region,
         project=settings.gcp_project,
     )
     payload = {

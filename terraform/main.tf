@@ -69,6 +69,10 @@ resource "google_cloud_run_v2_service" "service" {
         value = var.region
       }
       env {
+        name  = "VERTEX_AI_REGION"
+        value = var.vertex_ai_region
+      }
+      env {
         name  = "GCS_BUCKET"
         value = var.gcs_bucket
       }

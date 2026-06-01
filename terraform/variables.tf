@@ -6,7 +6,13 @@ variable "project_id" {
 variable "region" {
   description = "Cloud Run / Artifact Registry / Cloud Build のリージョン"
   type        = string
-  default     = "us-central1"
+  default     = "asia-northeast1"
+}
+
+variable "vertex_ai_region" {
+  description = "Vertex AI Virtual Try-On API のリージョン（asia-northeast1 未対応のため asia-southeast1 推奨）"
+  type        = string
+  default     = "asia-southeast1"
 }
 
 variable "gcs_bucket" {

@@ -30,14 +30,15 @@ steps:
       - --platform
       - managed
       - --set-env-vars
-      - GCP_PROJECT=$PROJECT_ID,GCP_REGION=$_REGION,GCS_BUCKET=$_GCS_BUCKET
+      - GCP_PROJECT=$PROJECT_ID,GCP_REGION=$_REGION,VERTEX_AI_REGION=$_VERTEX_AI_REGION,GCS_BUCKET=$_GCS_BUCKET
 
 images:
   - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA
   - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:latest
 
 substitutions:
-  _REGION: us-central1
+  _REGION: asia-northeast1
+  _VERTEX_AI_REGION: asia-southeast1
   _AR_REPO: virtual-try-on
   _SERVICE_NAME: virtual-try-on
   _GCS_BUCKET: ""
