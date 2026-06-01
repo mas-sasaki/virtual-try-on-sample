@@ -1,0 +1,46 @@
+steps:
+  # Docker イメージをビルド（SHA タグ + latest タグ）
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA
+      - -t
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:latest
+      - .
+
+  # Artifact Registry にプッシュ
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME
+
+  # Cloud Run にデプロイ
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE_NAME
+      - --image
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA
+      - --region
+      - $_REGION
+      - --platform
+      - managed
+      - --set-env-vars
+      - GCP_PROJECT=$PROJECT_ID,GCP_REGION=$_REGION,GCS_BUCKET=$_GCS_BUCKET
+
+images:
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$SHORT_SHA
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:latest
+
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: virtual-try-on
+  _SERVICE_NAME: virtual-try-on
+  _GCS_BUCKET: ""
+
+options:
+  logging: CLOUD_LOGGING_ONLY

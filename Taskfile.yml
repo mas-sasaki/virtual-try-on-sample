@@ -11,6 +11,8 @@ tasks:
     cmds:
       - uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
+  # ---- Docker ----
+
   docker-build:
     desc: Build Docker image
     vars:
@@ -25,6 +27,8 @@ tasks:
     cmds:
       - docker run --rm -p 8080:8080 --env-file .env {{.IMAGE}}
 
+  # ---- Terraform ----
+
   tf-init:
     desc: Initialize Terraform
     dir: terraform
@@ -38,13 +42,47 @@ tasks:
       - terraform plan
 
   tf-apply:
-    desc: Deploy to Cloud Run via Terraform
+    desc: Deploy infrastructure to Google Cloud via Terraform
     dir: terraform
     cmds:
       - terraform apply
 
   tf-destroy:
-    desc: Destroy Cloud Run resources
+    desc: Destroy all Terraform-managed resources
     dir: terraform
     cmds:
       - terraform destroy
+
+  tf-output:
+    desc: Show Terraform outputs (service URL etc.)
+    dir: terraform
+    cmds:
+      - terraform output
+
+  # ---- セットアップ（初回） ----
+
+  setup:
+    desc: |
+      初回セットアップガイド（実行するとステップを案内します）
+    cmds:
+      - |
+        echo ""
+        echo "=== Virtual Try-On セットアップ ==="
+        echo ""
+        echo "Step 1: terraform/terraform.tfvars を作成"
+        echo "  cp terraform/terraform.tfvars.example terraform/terraform.tfvars"
+        echo "  # project_id / gcs_bucket / github_owner / github_repo を設定"
+        echo ""
+        echo "Step 2: Cloud Build コンソールで GitHub 連携（初回のみ）"
+        echo "  https://console.cloud.google.com/cloud-build/triggers"
+        echo "  -> リポジトリを接続 -> GitHub (Cloud Build GitHub App)"
+        echo ""
+        echo "Step 3: Terraform でインフラを構築"
+        echo "  task tf-init && task tf-apply"
+        echo ""
+        echo "Step 4: main ブランチに push してデプロイ"
+        echo "  git push origin main"
+        echo ""
+        echo "Step 5: サービス URL の確認"
+        echo "  task tf-output"
+        echo ""

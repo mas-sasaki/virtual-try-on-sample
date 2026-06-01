@@ -12,6 +12,10 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  image_url = "${var.region}-docker.pkg.dev/${var.project_id}/${var.ar_repository_id}/${var.service_name}"
+}
+
 # ---- Artifact Registry ----
 
 resource "google_artifact_registry_repository" "repo" {
@@ -21,20 +25,20 @@ resource "google_artifact_registry_repository" "repo" {
   description   = "Virtual Try-On Docker images"
 }
 
-# ---- Service Account ----
+# ---- Cloud Run サービスアカウント ----
 
 resource "google_service_account" "cloudrun_sa" {
-  account_id   = "${var.service_name}-sa"
+  account_id   = "${var.service_name}-run-sa"
   display_name = "Virtual Try-On Cloud Run SA"
 }
 
-resource "google_project_iam_member" "vertex_user" {
+resource "google_project_iam_member" "cloudrun_vertex_user" {
   project = var.project_id
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
 }
 
-resource "google_project_iam_member" "storage_admin" {
+resource "google_project_iam_member" "cloudrun_storage_admin" {
   project = var.project_id
   role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
@@ -52,7 +56,9 @@ resource "google_cloud_run_v2_service" "service" {
     service_account = google_service_account.cloudrun_sa.email
 
     containers {
-      image = var.image_url
+      # 初回は Cloud Build が未実行のためプレースホルダーを使用
+      # 最初の push 後に Cloud Build が自動更新する
+      image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
 
       env {
         name  = "GCP_PROJECT"
@@ -76,6 +82,11 @@ resource "google_cloud_run_v2_service" "service" {
     }
 
     timeout = "120s"
+  }
+
+  lifecycle {
+    # image は Cloud Build が管理するため Terraform の差分を無視
+    ignore_changes = [template[0].containers[0].image]
   }
 }
 
