@@ -4,3 +4,10 @@ vertex_ai_region = "asia-southeast1"
 gcs_bucket       = "your-gcs-bucket-name"
 github_owner     = "your-github-username"
 github_repo      = "virtual-try-on-sample"
+
+# IAP（社内限定アクセス）
+domain            = "tryon.company.com"
+iap_support_email = "admin@company.com"
+iap_members       = ["domain:company.com"]
+# iap_members     = ["group:dev-team@company.com"]   # 特定グループのみの場合
+# iap_members     = ["user:alice@company.com"]        # 特定ユーザーのみの場合
