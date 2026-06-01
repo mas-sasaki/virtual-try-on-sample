@@ -59,6 +59,11 @@ tasks:
     cmds:
       - terraform output
 
+  generate-garments:
+    desc: Imagen 3 で衣服サンプル画像を生成して GCS にアップロード
+    cmds:
+      - uv run python scripts/generate_garments.py
+
   # ---- セットアップ（初回） ----
 
   setup:
