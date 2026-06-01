@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Virtual Try-On API テスト</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.4rem; }
+    section { margin: 24px 0; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+    h2 { font-size: 1rem; margin: 0 0 12px; }
+    button { padding: 8px 16px; cursor: pointer; }
+    img { max-width: 100%; margin-top: 12px; border: 1px solid #ccc; border-radius: 4px; }
+    select { width: 100%; padding: 6px; }
+    .status { margin-top: 8px; font-size: 0.875rem; color: #555; }
+    .error { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>Virtual Try-On API テスト UI</h1>
+
+  <section>
+    <h2>Step 1: 人物画像をアップロード</h2>
+    <input type="file" id="personFile" accept="image/jpeg,image/png">
+    <button onclick="uploadPerson()">アップロード</button>
+    <div class="status" id="uploadStatus"></div>
+    <img id="personPreview" style="display:none; max-height:300px;">
+  </section>
+
+  <section>
+    <h2>Step 2: 衣服を選択</h2>
+    <button onclick="loadGarments()">衣服一覧を取得</button>
+    <div style="margin-top:12px;">
+      <select id="garmentSelect" size="6" style="display:none;"></select>
+    </div>
+    <img id="garmentPreview" style="display:none; max-height:200px;">
+  </section>
+
+  <section>
+    <h2>Step 3: 試着する</h2>
+    <button onclick="runTryOn()" id="tryonBtn" disabled>試着する</button>
+    <div class="status" id="tryonStatus"></div>
+    <img id="resultImage" style="display:none; max-height:500px;">
+  </section>
+
+  <script>
+    let personGcsUri = null;
+    let garmentGcsUri = null;
+
+    async function uploadPerson() {
+      const file = document.getElementById('personFile').files[0];
+      if (!file) { alert('ファイルを選択してください'); return; }
+
+      const status = document.getElementById('uploadStatus');
+      status.textContent = 'アップロード中...';
+      status.className = 'status';
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: form });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+        const data = await res.json();
+        personGcsUri = data.gcs_uri;
+        status.textContent = `アップロード完了: ${data.gcs_uri}`;
+        const img = document.getElementById('personPreview');
+        img.src = data.signed_url;
+        img.style.display = 'block';
+        updateTryonBtn();
+      } catch (e) {
+        status.textContent = `エラー: ${e.message}`;
+        status.className = 'status error';
+      }
+    }
+
+    async function loadGarments() {
+      const res = await fetch('/api/garments');
+      const items = await res.json();
+      const sel = document.getElementById('garmentSelect');
+      sel.innerHTML = '';
+      items.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.gcs_uri;
+        opt.textContent = g.name;
+        opt.dataset.url = g.signed_url;
+        sel.appendChild(opt);
+      });
+      sel.style.display = 'block';
+      sel.onchange = () => {
+        const opt = sel.options[sel.selectedIndex];
+        garmentGcsUri = opt.value;
+        const img = document.getElementById('garmentPreview');
+        img.src = opt.dataset.url;
+        img.style.display = 'block';
+        updateTryonBtn();
+      };
+    }
+
+    function updateTryonBtn() {
+      document.getElementById('tryonBtn').disabled = !(personGcsUri && garmentGcsUri);
+    }
+
+    async function runTryOn() {
+      const status = document.getElementById('tryonStatus');
+      status.textContent = '試着処理中... (最大1分程度かかります)';
+      status.className = 'status';
+      document.getElementById('tryonBtn').disabled = true;
+      document.getElementById('resultImage').style.display = 'none';
+
+      try {
+        const res = await fetch('/api/tryon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ person_gcs_uri: personGcsUri, garment_gcs_uri: garmentGcsUri }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+        const data = await res.json();
+        status.textContent = `完了: ${data.result_gcs_uri}`;
+        const img = document.getElementById('resultImage');
+        img.src = data.result_url;
+        img.style.display = 'block';
+      } catch (e) {
+        status.textContent = `エラー: ${e.message}`;
+        status.className = 'status error';
+      } finally {
+        document.getElementById('tryonBtn').disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

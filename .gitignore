@@ -1,0 +1,10 @@
+.direnv/
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.terraform/
+*.tfstate
+*.tfstate.backup
+.env
+.claude/

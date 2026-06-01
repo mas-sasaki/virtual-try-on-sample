@@ -1,0 +1,50 @@
+version: '3'
+
+tasks:
+  install:
+    desc: Install Python dependencies
+    cmds:
+      - uv sync
+
+  dev:
+    desc: Run FastAPI dev server (requires .env)
+    cmds:
+      - uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+
+  docker-build:
+    desc: Build Docker image
+    vars:
+      IMAGE: '{{.IMAGE | default "virtual-try-on:latest"}}'
+    cmds:
+      - docker build -t {{.IMAGE}} .
+
+  docker-run:
+    desc: Run Docker container locally (requires .env)
+    vars:
+      IMAGE: '{{.IMAGE | default "virtual-try-on:latest"}}'
+    cmds:
+      - docker run --rm -p 8080:8080 --env-file .env {{.IMAGE}}
+
+  tf-init:
+    desc: Initialize Terraform
+    dir: terraform
+    cmds:
+      - terraform init
+
+  tf-plan:
+    desc: Terraform plan
+    dir: terraform
+    cmds:
+      - terraform plan
+
+  tf-apply:
+    desc: Deploy to Cloud Run via Terraform
+    dir: terraform
+    cmds:
+      - terraform apply
+
+  tf-destroy:
+    desc: Destroy Cloud Run resources
+    dir: terraform
+    cmds:
+      - terraform destroy
