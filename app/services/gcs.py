@@ -1,6 +1,5 @@
 import uuid
-import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 
 from google.cloud import storage
 
@@ -11,6 +10,10 @@ def _client() -> storage.Client:
     return storage.Client(project=settings.gcp_project)
 
 
+def _image_url(gcs_uri: str) -> str:
+    return "/api/image?" + urlencode({"uri": gcs_uri})
+
+
 def list_garments() -> list[dict]:
     client = _client()
     blobs = client.list_blobs(settings.gcs_bucket, prefix=settings.gcs_garments_prefix)
@@ -18,16 +21,12 @@ def list_garments() -> list[dict]:
     for blob in blobs:
         if blob.name == settings.gcs_garments_prefix:
             continue
-        signed_url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(hours=1),
-            method="GET",
-        )
+        gcs_uri = f"gs://{settings.gcs_bucket}/{blob.name}"
         results.append(
             {
                 "name": blob.name.removeprefix(settings.gcs_garments_prefix),
-                "gcs_uri": f"gs://{settings.gcs_bucket}/{blob.name}",
-                "signed_url": signed_url,
+                "gcs_uri": gcs_uri,
+                "image_url": _image_url(gcs_uri),
             }
         )
     return results
@@ -40,14 +39,10 @@ def upload_user_image(file_bytes: bytes, content_type: str) -> dict:
     bucket = client.bucket(settings.gcs_bucket)
     blob = bucket.blob(blob_name)
     blob.upload_from_string(file_bytes, content_type=content_type)
-    signed_url = blob.generate_signed_url(
-        version="v4",
-        expiration=datetime.timedelta(hours=1),
-        method="GET",
-    )
+    gcs_uri = f"gs://{settings.gcs_bucket}/{blob_name}"
     return {
-        "gcs_uri": f"gs://{settings.gcs_bucket}/{blob_name}",
-        "signed_url": signed_url,
+        "gcs_uri": gcs_uri,
+        "image_url": _image_url(gcs_uri),
     }
 
 
@@ -57,14 +52,10 @@ def save_result_image(image_bytes: bytes) -> dict:
     bucket = client.bucket(settings.gcs_bucket)
     blob = bucket.blob(blob_name)
     blob.upload_from_string(image_bytes, content_type="image/png")
-    signed_url = blob.generate_signed_url(
-        version="v4",
-        expiration=datetime.timedelta(hours=1),
-        method="GET",
-    )
+    gcs_uri = f"gs://{settings.gcs_bucket}/{blob_name}"
     return {
-        "gcs_uri": f"gs://{settings.gcs_bucket}/{blob_name}",
-        "signed_url": signed_url,
+        "gcs_uri": gcs_uri,
+        "image_url": _image_url(gcs_uri),
     }
 
 

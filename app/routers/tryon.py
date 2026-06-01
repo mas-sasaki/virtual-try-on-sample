@@ -26,4 +26,4 @@ def try_on(req: TryOnRequest):
         raise HTTPException(status_code=502, detail=f"Virtual Try-On API エラー: {e}")
 
     result = save_result_image(result_bytes)
-    return {"result_url": result["signed_url"], "result_gcs_uri": result["gcs_uri"]}
+    return {"result_url": result["image_url"], "result_gcs_uri": result["gcs_uri"]}

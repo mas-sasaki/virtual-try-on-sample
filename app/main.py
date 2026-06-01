@@ -3,13 +3,14 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse
 
-from app.routers import garments, upload, tryon
+from app.routers import garments, upload, tryon, image
 
 app = FastAPI(title="Virtual Try-On API", version="0.1.0")
 
 app.include_router(garments.router)
 app.include_router(upload.router)
 app.include_router(tryon.router)
+app.include_router(image.router)
 
 _INDEX_HTML = pathlib.Path(__file__).parent / "templates" / "index.html"
 

@@ -64,7 +64,7 @@
         personGcsUri = data.gcs_uri;
         status.textContent = `アップロード完了: ${data.gcs_uri}`;
         const img = document.getElementById('personPreview');
-        img.src = data.signed_url;
+        img.src = data.image_url;
         img.style.display = 'block';
         updateTryonBtn();
       } catch (e) {
@@ -82,7 +82,7 @@
         const opt = document.createElement('option');
         opt.value = g.gcs_uri;
         opt.textContent = g.name;
-        opt.dataset.url = g.signed_url;
+        opt.dataset.url = g.image_url;
         sel.appendChild(opt);
       });
       sel.style.display = 'block';
