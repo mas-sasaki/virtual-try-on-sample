@@ -22,7 +22,6 @@
       --radius-sm:    8px;
       --shadow:       0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
       --shadow-md:    0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04);
-      --shadow-lg:    0 10px 24px -4px rgba(0,0,0,.10);
     }
 
     body {
@@ -67,17 +66,13 @@
 
     /* ---- Layout ---- */
     main {
-      max-width: 1280px;
+      max-width: 960px;
       margin: 0 auto;
       padding: 28px 24px;
-      display: grid;
-      grid-template-columns: 1fr 400px;
-      gap: 20px;
-      align-items: start;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-
-    .left-col { display: flex; flex-direction: column; gap: 16px; }
-    .right-col { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 16px; }
 
     /* ---- Card ---- */
     .card {
@@ -110,7 +105,6 @@
     /* ---- Tabs ---- */
     .tabs {
       display: flex;
-      gap: 0;
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
@@ -205,9 +199,7 @@
       opacity: 0.45;
       cursor: not-allowed;
     }
-    .garments-locked .item-card.selected {
-      opacity: 0.8;
-    }
+    .garments-locked .item-card.selected { opacity: 0.8; }
 
     /* ---- Garment two-col ---- */
     .garment-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -222,10 +214,7 @@
       align-items: center;
       gap: 6px;
     }
-    .garment-col-title .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-    }
+    .garment-col-title .dot { width: 8px; height: 8px; border-radius: 50%; }
     .dot-top    { background: #818cf8; }
     .dot-bottom { background: #34d399; }
 
@@ -245,7 +234,6 @@
     .upload-area p { font-size: 0.8rem; color: var(--text-muted); }
     .upload-area strong { color: var(--primary); }
 
-    /* ---- Upload button ---- */
     .btn-upload {
       margin-top: 12px;
       width: 100%;
@@ -284,6 +272,18 @@
       padding: 4px 8px;
     }
 
+    /* ---- Notice ---- */
+    .notice-msg {
+      font-size: 0.8rem;
+      color: #b45309;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
     /* ---- Applied chips ---- */
     .applied-chips {
       display: flex;
@@ -296,9 +296,6 @@
       border-radius: 20px;
       font-size: 0.72rem;
       font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
     }
     .chip-top    { background: #ede9fe; color: var(--primary); }
     .chip-bottom { background: #d1fae5; color: #065f46; }
@@ -312,17 +309,6 @@
     }
     .status-msg.error { color: #ef4444; }
 
-    .notice-msg {
-      font-size: 0.8rem;
-      color: #b45309;
-      background: #fef3c7;
-      border: 1px solid #fde68a;
-      border-radius: var(--radius-sm);
-      padding: 8px 12px;
-      margin-bottom: 12px;
-      display: none;
-    }
-
     .spinner {
       display: none;
       margin: 12px auto;
@@ -335,26 +321,49 @@
     .spinner.visible { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ---- Result ---- */
-    .result-wrap {
+    /* ---- Before/After comparison ---- */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 4px;
+    }
+
+    .comparison-col-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 6px 0;
+      margin-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+      letter-spacing: .03em;
+    }
+    .comparison-col-label.label-after {
+      color: var(--primary);
+      border-color: #c7d2fe;
+    }
+
+    .image-wrap {
       border-radius: var(--radius-sm);
       overflow: hidden;
       border: 1px solid var(--border);
       background: var(--surface-2);
-      min-height: 200px;
+      min-height: 220px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .result-placeholder {
+    .image-placeholder {
       text-align: center;
       color: #cbd5e1;
-      padding: 32px;
+      padding: 28px 16px;
     }
-    .result-placeholder .ri { font-size: 3rem; margin-bottom: 8px; }
-    .result-placeholder p { font-size: 0.8rem; }
-    .result-img { width: 100%; display: block; }
+    .image-placeholder .pi { font-size: 2.5rem; margin-bottom: 8px; }
+    .image-placeholder p { font-size: 0.78rem; }
+    .compare-img { width: 100%; display: block; }
 
+    /* ---- Skeleton ---- */
     .skeleton {
       background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
       background-size: 200% 100%;
@@ -364,17 +373,9 @@
     @keyframes shimmer { to { background-position: -200% 0; } }
     .skeleton-card { height: 140px; }
 
-    /* ---- Loading state for grids ---- */
-    .loading-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 10px;
-    }
-    .loading-grid .skeleton-card { border-radius: var(--radius-sm); }
-
     /* ---- Reset button ---- */
     .btn-reset {
-      margin-top: 12px;
+      margin-top: 14px;
       width: 100%;
       padding: 9px;
       background: var(--surface-2);
@@ -388,7 +389,7 @@
     }
     .btn-reset:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 
-    /* ---- Hint below step 2 grids ---- */
+    /* ---- Chain hint ---- */
     .chain-hint {
       font-size: 0.75rem;
       color: var(--primary);
@@ -407,123 +408,130 @@
 </header>
 
 <main>
-  <!-- ===== LEFT COL ===== -->
-  <div class="left-col">
 
-    <!-- Step 1: Person -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-num">1</div>
-        <div class="step-title">人物を選択</div>
-        <div class="step-sub" id="personStepSub"></div>
-      </div>
-
-      <div class="tabs">
-        <div class="tab active" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
-        <div class="tab" id="tabUpload" onclick="switchTab('upload')">写真をアップロード</div>
-      </div>
-
-      <!-- マネキン -->
-      <div id="panelMannequin">
-        <div id="mannequinGrid" class="item-grid">
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-          <div class="skeleton skeleton-card"></div>
-        </div>
-        <div class="status-msg" id="mannequinStatus"></div>
-      </div>
-
-      <!-- アップロード -->
-      <div id="panelUpload" style="display:none;">
-        <div class="upload-area" id="uploadArea">
-          <input type="file" id="personFile" accept="image/jpeg,image/png" onchange="handleFileChange()">
-          <div class="upload-icon">📷</div>
-          <p><strong>クリックして画像を選択</strong></p>
-          <p>JPG / PNG（全身写真推奨）</p>
-        </div>
-        <button class="btn-upload" id="btnUpload" onclick="uploadPerson()" style="display:none;">アップロード</button>
-        <div class="status-msg" id="uploadStatus"></div>
-      </div>
-
-      <!-- 人物選択済みプレビュー -->
-      <div class="person-preview" id="personPreview" style="display:none;">
-        <img id="personThumb" src="" alt="person">
-        <div class="pinfo">
-          <div class="pname" id="personName">—</div>
-          <div class="psub">選択済み</div>
-        </div>
-        <button class="pchange" onclick="clearPerson()">変更</button>
-      </div>
+  <!-- Step 1: Person -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">人物を選択</div>
+      <div class="step-sub" id="personStepSub"></div>
     </div>
 
-    <!-- Step 2: Garments -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-num">2</div>
-        <div class="step-title">衣服を選択</div>
-        <div class="step-sub">選ぶと自動で試着します</div>
-      </div>
+    <div class="tabs">
+      <div class="tab active" id="tabMannequin" onclick="switchTab('mannequin')">マネキンを選択</div>
+      <div class="tab" id="tabUpload" onclick="switchTab('upload')">写真をアップロード</div>
+    </div>
 
-      <!-- 人物未選択の警告 -->
-      <div class="notice-msg" id="garmentNoPerson">先に人物を選択してください</div>
-
-      <div id="garmentSection">
-        <div class="garment-cols">
-          <div>
-            <div class="garment-col-title">
-              <span class="dot dot-top"></span> トップス
-            </div>
-            <div id="topsGrid" class="item-grid">
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-card"></div>
-            </div>
-          </div>
-          <div>
-            <div class="garment-col-title">
-              <span class="dot dot-bottom"></span> ボトムス
-            </div>
-            <div id="bottomsGrid" class="item-grid">
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-card"></div>
-              <div class="skeleton skeleton-card"></div>
-            </div>
-          </div>
-        </div>
-        <div class="chain-hint" id="chainHint">✨ 試着結果に重ねて選択できます</div>
+    <!-- マネキン -->
+    <div id="panelMannequin">
+      <div id="mannequinGrid" class="item-grid">
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
       </div>
+      <div class="status-msg" id="mannequinStatus"></div>
+    </div>
+
+    <!-- アップロード -->
+    <div id="panelUpload" style="display:none;">
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="personFile" accept="image/jpeg,image/png" onchange="handleFileChange()">
+        <div class="upload-icon">📷</div>
+        <p><strong>クリックして画像を選択</strong></p>
+        <p>JPG / PNG（全身写真推奨）</p>
+      </div>
+      <button class="btn-upload" id="btnUpload" onclick="uploadPerson()" style="display:none;">アップロード</button>
+      <div class="status-msg" id="uploadStatus"></div>
+    </div>
+
+    <!-- 人物選択済みプレビュー -->
+    <div class="person-preview" id="personPreview" style="display:none;">
+      <img id="personThumb" src="" alt="person">
+      <div class="pinfo">
+        <div class="pname" id="personName">—</div>
+        <div class="psub">選択済み</div>
+      </div>
+      <button class="pchange" onclick="clearPerson()">変更</button>
     </div>
   </div>
 
-  <!-- ===== RIGHT COL ===== -->
-  <div class="right-col">
-    <div class="card">
-      <div class="step-header" style="margin-bottom:12px;">
-        <div class="step-title">試着結果</div>
-      </div>
+  <!-- Step 2: Garments -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">衣服を選択</div>
+      <div class="step-sub">選ぶと自動で試着します</div>
+    </div>
 
-      <!-- Applied chips -->
-      <div class="applied-chips" id="appliedChips" style="display:none;"></div>
+    <div class="notice-msg" id="garmentNoPerson">先に人物を選択してください</div>
 
-      <!-- Spinner + status -->
-      <div class="spinner" id="spinner"></div>
-      <div class="status-msg" id="tryonStatus" style="margin-bottom:8px;"></div>
-
-      <!-- Result image -->
-      <div class="result-wrap" id="resultWrap">
-        <div class="result-placeholder">
-          <div class="ri">✨</div>
-          <p>衣服を選ぶと自動で試着します</p>
+    <div id="garmentSection">
+      <div class="garment-cols">
+        <div>
+          <div class="garment-col-title">
+            <span class="dot dot-top"></span> トップス
+          </div>
+          <div id="topsGrid" class="item-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+        </div>
+        <div>
+          <div class="garment-col-title">
+            <span class="dot dot-bottom"></span> ボトムス
+          </div>
+          <div id="bottomsGrid" class="item-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
         </div>
       </div>
-
-      <!-- Reset -->
-      <button class="btn-reset" id="btnReset" onclick="resetTryon()" style="display:none;">
-        ↺ 最初からやり直す
-      </button>
+      <div class="chain-hint" id="chainHint">✨ 衣服を変更・追加できます</div>
     </div>
   </div>
+
+  <!-- Step 3: Before / After -->
+  <div class="card">
+    <div class="step-header" style="margin-bottom:8px;">
+      <div class="step-num">3</div>
+      <div class="step-title">試着結果</div>
+    </div>
+
+    <!-- Applied chips + status -->
+    <div class="applied-chips" id="appliedChips" style="display:none;"></div>
+    <div class="spinner" id="spinner"></div>
+    <div class="status-msg" id="tryonStatus" style="margin-bottom:8px;"></div>
+
+    <!-- Before / After side by side -->
+    <div class="comparison-grid">
+      <div>
+        <div class="comparison-col-label">試着前</div>
+        <div class="image-wrap" id="beforeWrap">
+          <div class="image-placeholder">
+            <div class="pi">👤</div>
+            <p>人物を選択してください</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="comparison-col-label label-after">試着後</div>
+        <div class="image-wrap" id="resultWrap">
+          <div class="image-placeholder">
+            <div class="pi">✨</div>
+            <p>衣服を選ぶと自動で試着します</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-reset" id="btnReset" onclick="resetTryon()" style="display:none;">
+      ↺ 最初からやり直す
+    </button>
+  </div>
+
 </main>
 
 <script>
@@ -565,7 +573,12 @@
     originalPersonGcsUri = originalPersonImgUrl = originalPersonLabel = null;
     document.getElementById('personPreview').style.display = 'none';
     document.getElementById('personStepSub').textContent = '';
-    resetTryonState(/* clearResult= */ true);
+    document.getElementById('beforeWrap').innerHTML = `
+      <div class="image-placeholder">
+        <div class="pi">👤</div>
+        <p>人物を選択してください</p>
+      </div>`;
+    resetTryonState(true);
   }
 
   // ===== Upload =====
@@ -687,7 +700,9 @@
     document.getElementById('personName').textContent = label;
     document.getElementById('personPreview').style.display = 'flex';
     document.getElementById('personStepSub').textContent = `✓ ${label}`;
-    resetTryonState(/* clearResult= */ true);
+    document.getElementById('beforeWrap').innerHTML =
+      `<img class="compare-img" src="${imageUrl}" alt="試着前">`;
+    resetTryonState(true);
   }
 
   function showNoPersonHint() {
@@ -726,8 +741,8 @@
     document.getElementById('tryonStatus').className = 'status-msg';
     if (clearResult) {
       document.getElementById('resultWrap').innerHTML = `
-        <div class="result-placeholder">
-          <div class="ri">✨</div>
+        <div class="image-placeholder">
+          <div class="pi">✨</div>
           <p>衣服を選ぶと自動で試着します</p>
         </div>`;
     }
@@ -735,7 +750,7 @@
 
   function resetTryon() {
     if (!originalPersonGcsUri) return;
-    resetTryonState(/* clearResult= */ true);
+    resetTryonState(true);
   }
 
   // ===== Applied chips =====
@@ -765,7 +780,6 @@
       </div>`;
 
     try {
-      // 常に original person から出発し、現在選択中の全衣服を送る
       const body = { person_gcs_uri: originalPersonGcsUri };
       if (selectedTop)    body.top_gcs_uri    = selectedTop.gcsUri;
       if (selectedBottom) body.bottom_gcs_uri = selectedBottom.gcsUri;
@@ -779,7 +793,7 @@
       const data = await res.json();
 
       document.getElementById('resultWrap').innerHTML =
-        `<img class="result-img" src="${data.result_url}" alt="試着結果">`;
+        `<img class="compare-img" src="${data.result_url}" alt="試着後">`;
 
       status.textContent = '完了 — 衣服を変更・追加できます';
       updateAppliedChips();
@@ -790,8 +804,8 @@
       status.textContent = `エラー: ${e.message}`;
       status.className = 'status-msg error';
       document.getElementById('resultWrap').innerHTML = `
-        <div class="result-placeholder">
-          <div class="ri">⚠️</div>
+        <div class="image-placeholder">
+          <div class="pi">⚠️</div>
           <p>${e.message}</p>
         </div>`;
     } finally {
