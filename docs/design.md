@@ -63,7 +63,9 @@ gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
-  storage.googleapis.com
+  storage.googleapis.com \
+  compute.googleapis.com \
+  iap.googleapis.com
 ```
 
 | API | 用途 |
@@ -73,6 +75,8 @@ gcloud services enable \
 | `artifactregistry.googleapis.com` | Docker イメージ管理 |
 | `cloudbuild.googleapis.com` | CI/CD パイプライン |
 | `storage.googleapis.com` | GCS |
+| `compute.googleapis.com` | Cloud Load Balancing |
+| `iap.googleapis.com` | Identity-Aware Proxy |
 
 ---
 
@@ -181,7 +185,88 @@ gcloud storage buckets create gs://BUCKET_NAME --location=asia-northeast1
 
 ---
 
-## 8. デプロイフロー
+## 8. 社内限定アクセス制御（IAP）
+
+### 概要
+
+Cloud Load Balancer の前段に **Identity-Aware Proxy (IAP)** を設置することで、社員の Google アカウントで認証されたユーザーのみアクセスを許可する。アプリ側のコード変更は不要。
+
+```
+ブラウザ
+  │
+  ▼ HTTPS (カスタムドメイン)
+Cloud Load Balancer
+  │
+  ▼ IAP（Google アカウント認証）
+  │  → 未認証: Google ログイン画面にリダイレクト
+  │  → 認証済み・権限なし: 403 Forbidden
+  │  → 認証済み・権限あり: ↓
+  ▼
+Cloud Run (ingress = INTERNAL_LOAD_BALANCER)
+  ※ 直接 URL（*.run.app）へのアクセスは ingress 制限で遮断
+```
+
+### アクセス制御の仕組み
+
+| レイヤー | 制御内容 |
+|---------|---------|
+| Cloud Run ingress | `INTERNAL_LOAD_BALANCER` — LB 以外からの直接アクセスを遮断 |
+| IAP | Google アカウント認証 + `iap_members` 変数に指定したユーザー/グループ/ドメインのみ許可 |
+
+### terraform.tfvars に追加が必要な変数
+
+```hcl
+domain            = "tryon.company.com"        # カスタムドメイン
+iap_support_email = "admin@company.com"         # OAuth 同意画面のサポートメール
+iap_members       = ["domain:company.com"]      # 社員全員を許可する場合
+# iap_members     = ["group:dev@company.com"]   # 特定グループのみの場合
+# iap_members     = ["user:alice@company.com"]  # 特定ユーザーのみの場合
+```
+
+### セットアップ手順（IAP 有効化）
+
+```
+1. GCP API 追加有効化
+   └─ gcloud services enable compute.googleapis.com iap.googleapis.com
+
+2. OAuth 同意画面を設定（コンソールで手動）
+   └─ GCP コンソール → APIs & Services → OAuth 同意画面
+      → ユーザーの種類: 「内部」（Google Workspace 組織内のみ）を選択
+      → アプリ名・サポートメールを入力して保存
+
+3. terraform.tfvars に domain / iap_support_email / iap_members を追加
+
+4. terraform apply
+   ├─ LB・NEG・Backend Service・IAP が作成される
+   └─ terraform output lb_ip で IP アドレスを確認
+
+5. DNS A レコードを設定
+   └─ domain → lb_ip（取得した IP アドレス）
+
+6. SSL 証明書のプロビジョニングを待つ
+   └─ 最大 60 分程度かかる場合がある
+   └─ 確認: gcloud compute ssl-certificates describe virtual-try-on-cert \
+               --global --format="value(managed.status)"
+      "ACTIVE" になれば完了
+
+7. ブラウザで https://{domain} にアクセスして Google ログイン画面が表示されることを確認
+```
+
+### 既存 IAP Brand がある場合の対応
+
+プロジェクトに IAP Brand が既に存在する場合、`terraform apply` でエラーになる。以下でインポートする。
+
+```bash
+# プロジェクト番号の確認
+PROJECT_NUMBER=$(gcloud projects describe PROJECT_ID --format="value(projectNumber)")
+
+# import
+terraform import google_iap_brand.default projects/${PROJECT_NUMBER}/brands/${PROJECT_NUMBER}
+```
+
+---
+
+## 9. デプロイフロー
 
 ### 初回セットアップ
 
@@ -222,7 +307,7 @@ git push origin main  →  Cloud Build  →  Cloud Run（自動）
 
 ---
 
-## 9. Vertex AI Virtual Try-On API 仕様
+## 10. Vertex AI Virtual Try-On API 仕様
 
 ### エンドポイント
 
@@ -283,7 +368,7 @@ POST https://{region}-aiplatform.googleapis.com/v1/projects/{project}
 
 ---
 
-## 10. チェーン試着の設計
+## 11. チェーン試着の設計
 
 ### 課題
 
@@ -371,7 +456,7 @@ def run_virtual_tryon(person_bytes, top_bytes, bottom_bytes) -> bytes:
 
 ---
 
-## 11. API エンドポイント仕様（FastAPI）
+## 12. API エンドポイント仕様（FastAPI）
 
 ### GET /health
 
@@ -502,7 +587,7 @@ Signed URL の代わりにこのエンドポイントを使う。Application Def
 
 ---
 
-## 12. 技術スタック
+## 13. 技術スタック
 
 | カテゴリ | 採用技術 | バージョン |
 |---------|---------|-----------|

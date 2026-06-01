@@ -88,14 +88,18 @@ resource "google_cloud_run_v2_service" "service" {
     timeout = "120s"
   }
 
+  # LB 経由のトラフィックのみ受け付ける（直接 URL アクセスを遮断）
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
   lifecycle {
     # image は Cloud Build が管理するため Terraform の差分を無視
     ignore_changes = [template[0].containers[0].image]
   }
 }
 
-# パブリックアクセス（検証用）
-resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
+# allUsers を維持しつつ ingress 制限でネットワーク制御
+# 実際の認証は IAP (iap.tf) が担当する
+resource "google_cloud_run_v2_service_iam_member" "lb_invoker" {
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.service.name

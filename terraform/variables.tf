@@ -41,3 +41,23 @@ variable "github_repo" {
   description = "GitHub リポジトリ名"
   type        = string
 }
+
+variable "domain" {
+  description = "カスタムドメイン（IAP + LB 用、例: tryon.company.com）"
+  type        = string
+}
+
+variable "iap_support_email" {
+  description = "IAP OAuth 同意画面のサポートメールアドレス（プロジェクト管理者のアドレス）"
+  type        = string
+}
+
+variable "iap_members" {
+  description = <<-EOT
+    IAP アクセスを許可するメンバーリスト。形式の例:
+      社員全員 (Google Workspace ドメイン): ["domain:company.com"]
+      特定ユーザー:                          ["user:alice@company.com", "user:bob@company.com"]
+      Google グループ:                       ["group:dev-team@company.com"]
+  EOT
+  type        = list(string)
+}

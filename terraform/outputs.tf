@@ -22,3 +22,13 @@ output "cloudbuild_service_account" {
   description = "Cloud Build 用サービスアカウント"
   value       = google_service_account.cloudbuild_sa.email
 }
+
+output "lb_ip" {
+  description = "ロードバランサーの IP アドレス（DNS A レコードに設定する）"
+  value       = google_compute_global_address.lb.address
+}
+
+output "app_url" {
+  description = "アプリケーションの URL（IAP 経由）"
+  value       = "https://${var.domain}"
+}
