@@ -23,7 +23,7 @@ GARMENTS_PREFIX = os.environ.get("GCS_GARMENTS_PREFIX", "garments/")
 
 GARMENTS = [
     # (ファイル名, プロンプト)
-    # ---- トップス（共通） ----
+    # ---- トップス ----
     (
         "tops/white-tshirt.png",
         "white plain cotton t-shirt, flat lay on pure white background, "
@@ -44,28 +44,27 @@ GARMENTS = [
         "light blue pullover hoodie sweatshirt, flat lay on pure white background, "
         "front view, product photography, clean minimal style",
     ),
-    # ---- トップス（女性向け） ----
     (
-        "tops/womens-white-blouse.png",
-        "women's white flowy chiffon blouse with delicate ruffles, "
+        "tops/white-blouse.png",
+        "white flowy chiffon blouse with delicate ruffles, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
-        "tops/womens-floral-top.png",
-        "women's floral print short-sleeve top, pink and white flowers pattern, "
+        "tops/floral-top.png",
+        "floral print short-sleeve top, pink and white flowers pattern, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
-        "tops/womens-pink-knit.png",
-        "women's soft pink cable-knit cropped sweater, "
+        "tops/pink-knit.png",
+        "soft pink cable-knit cropped sweater, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
-        "tops/womens-beige-cardigan.png",
-        "women's beige open-front longline cardigan, "
+        "tops/beige-cardigan.png",
+        "beige open-front longline cardigan, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
-    # ---- ボトムス（共通） ----
+    # ---- ボトムス ----
     (
         "bottoms/blue-jeans.png",
         "blue straight-leg denim jeans, flat lay on pure white background, "
@@ -86,25 +85,24 @@ GARMENTS = [
         "grey cotton sweatpants joggers, flat lay on pure white background, "
         "front view, product photography, clean minimal style",
     ),
-    # ---- スカート（女性向け） ----
     (
         "bottoms/floral-midi-skirt.png",
-        "women's floral print chiffon midi skirt, pink and white flowers, "
+        "floral print chiffon midi skirt, pink and white flowers, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
         "bottoms/white-pleated-skirt.png",
-        "women's white pleated mini skirt, "
+        "white pleated mini skirt, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
         "bottoms/black-mini-skirt.png",
-        "women's black A-line mini skirt, "
+        "black A-line mini skirt, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
     (
         "bottoms/denim-skirt.png",
-        "women's light blue denim mini skirt with front buttons, "
+        "light blue denim mini skirt with front buttons, "
         "flat lay on pure white background, front view, product photography, clean minimal style",
     ),
 ]
