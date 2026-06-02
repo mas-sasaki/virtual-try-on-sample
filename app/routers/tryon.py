@@ -11,6 +11,7 @@ class TryOnRequest(BaseModel):
     person_gcs_uri: str
     top_gcs_uri: str | None = None
     bottom_gcs_uri: str | None = None
+    top_label: str | None = None  # ガーメント名（アウター判定に使用、任意）
 
     @model_validator(mode="after")
     def check_at_least_one_garment(self):
@@ -29,7 +30,7 @@ def try_on(req: TryOnRequest):
         raise HTTPException(status_code=400, detail=f"GCS から画像を取得できませんでした: {e}")
 
     try:
-        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes)
+        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes, top_label=req.top_label)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Virtual Try-On API エラー: {e}")
 
