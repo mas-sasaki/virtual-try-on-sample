@@ -7,7 +7,12 @@ github_repo      = "virtual-try-on-sample"
 
 # IAP（社内限定アクセス）
 # OAuth クライアントは GCP コンソールで手動作成（docs/design.md セクション8 参照）
-domain                   = "tryon.company.com"
+
+# カスタムドメインがある場合: "tryon.company.com"
+# DNS 追加が不要な sslip.io を使う場合: "<LB_IP>.sslip.io"
+#   例: task tf-apply 後に出力される lb_ip が 8.232.122.210 なら "8.232.122.210.sslip.io"
+domain                   = "8.232.122.210.sslip.io"
+
 iap_oauth2_client_id     = "xxxxx.apps.googleusercontent.com"
 iap_oauth2_client_secret = "GOCSPX-xxxxxx"
 iap_members              = ["domain:company.com"]
