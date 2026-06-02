@@ -7,13 +7,6 @@ from app.services.vertex_ai import run_virtual_tryon
 router = APIRouter(prefix="/api/tryon", tags=["tryon"])
 
 
-def _stem_from_uri(uri: str | None) -> str | None:
-    """gs://bucket/garments/tops/black-blazer.png → black-blazer"""
-    if not uri:
-        return None
-    return uri.rstrip("/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
-
-
 class TryOnRequest(BaseModel):
     person_gcs_uri: str
     top_gcs_uri: str | None = None
@@ -36,10 +29,7 @@ def try_on(req: TryOnRequest):
         raise HTTPException(status_code=400, detail=f"GCS から画像を取得できませんでした: {e}")
 
     try:
-        result_bytes = run_virtual_tryon(
-            person_bytes, top_bytes, bottom_bytes,
-            top_label=_stem_from_uri(req.top_gcs_uri),
-        )
+        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Virtual Try-On API エラー: {e}")
 
