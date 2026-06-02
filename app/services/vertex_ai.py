@@ -30,8 +30,10 @@ def run_virtual_tryon(
     bottom_image_bytes: bytes | None,
 ) -> bytes:
     result = person_image_bytes
-    if top_image_bytes:
-        result = _call_tryon(result, top_image_bytes)
+    # ボトムスを先に適用し、その上にトップスを重ねることで
+    # トップス適用時（上半身処理）にボトムスが残りやすくなる
     if bottom_image_bytes:
         result = _call_tryon(result, bottom_image_bytes)
+    if top_image_bytes:
+        result = _call_tryon(result, top_image_bytes)
     return result
