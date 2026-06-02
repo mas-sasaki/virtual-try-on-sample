@@ -36,8 +36,10 @@ resource "google_project_iam_member" "cloudbuild_log_writer" {
 # ---- Cloud Build トリガー ----
 # 前提: Cloud Build コンソールで GitHub App 接続を事前に完了しておくこと
 # https://console.cloud.google.com/cloud-build/triggers → リポジトリを接続
+# 接続完了後に terraform.tfvars で create_cloudbuild_trigger = true にして再 apply
 
 resource "google_cloudbuild_trigger" "push_main" {
+  count    = var.create_cloudbuild_trigger ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = "${var.service_name}-push-main"

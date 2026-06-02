@@ -42,6 +42,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "create_cloudbuild_trigger" {
+  description = "Cloud Build トリガーを作成するか。GitHub App 接続完了後に true に変更して再 apply する"
+  type        = bool
+  default     = false
+}
+
 variable "domain" {
   description = "カスタムドメイン（IAP + LB 用、例: tryon.company.com）"
   type        = string
