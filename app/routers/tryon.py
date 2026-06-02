@@ -7,11 +7,18 @@ from app.services.vertex_ai import run_virtual_tryon
 router = APIRouter(prefix="/api/tryon", tags=["tryon"])
 
 
+def _stem_from_uri(uri: str | None) -> str | None:
+    """GCS URI からファイル名（拡張子なし）を取得する。例: gs://b/garments/tops/black-blazer.png → black-blazer"""
+    if not uri:
+        return None
+    return uri.rstrip("/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
+
+
 class TryOnRequest(BaseModel):
     person_gcs_uri: str
     top_gcs_uri: str | None = None
     bottom_gcs_uri: str | None = None
-    top_label: str | None = None  # ガーメント名（アウター判定に使用、任意）
+    top_label: str | None = None  # 省略時は top_gcs_uri のファイル名を使用
 
     @model_validator(mode="after")
     def check_at_least_one_garment(self):
@@ -29,8 +36,10 @@ def try_on(req: TryOnRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"GCS から画像を取得できませんでした: {e}")
 
+    top_label = req.top_label or _stem_from_uri(req.top_gcs_uri)
+
     try:
-        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes, top_label=req.top_label)
+        result_bytes = run_virtual_tryon(person_bytes, top_bytes, bottom_bytes, top_label=top_label)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Virtual Try-On API エラー: {e}")
 
