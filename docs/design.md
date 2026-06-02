@@ -13,44 +13,26 @@ Vertex AI の `virtual-try-on-001` モデルを使い、人物画像と衣服画
 
 ## 2. アーキテクチャ
 
+### リクエストフロー
+
+```mermaid
+graph TB
+    USR[👤 ユーザー] -->|HTTPS| LB[Cloud Load Balancer<br/>グローバル静的IP]
+    LB --> IAP[IAP<br/>Identity-Aware Proxy<br/>Google アカウント認証]
+    IAP -->|未認証: ログイン画面| USR
+    IAP -->|認証済みのみ| CR[Cloud Run v2<br/>FastAPI<br/>asia-northeast1]
+    CR -->|画像読み書き| GCS[(Cloud Storage<br/>asia-northeast1<br/>garments/ mannequins/<br/>uploads/ results/)]
+    CR -->|試着 API| VAI[Vertex AI<br/>virtual-try-on-001<br/>asia-southeast1]
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 開発者                                                       │
-│   git push (main)                                            │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Cloud Build (asia-northeast1)                                │
-│   1. docker build                                            │
-│   2. docker push → Artifact Registry                        │
-│   3. gcloud run deploy → Cloud Run                          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Cloud Run (asia-northeast1)  ← FastAPI アプリ               │
-│                                                              │
-│  GET  /api/garments    ─────────────────────────────┐       │
-│  GET  /api/mannequins  ─────────────────────────┐   │       │
-│  POST /api/upload      ─────────────────────┐   │   │       │
-│  POST /api/tryon       ─────────────┐       │   │   │       │
-│  GET  /api/image       ─────────┐   │       │   │   │       │
-│  GET  /                (UI)     │   │       │   │   │       │
-└────────────────────────────────┼───┼───────┼───┼───┼───────┘
-                                 │   │       │   │   │
-              ┌──────────────────┘   │       │   │   │
-              │  画像プロキシ取得     │       │   │   │
-              ▼                      ▼       ▼   ▼   ▼
-┌────────────────────────┐   ┌──────────────────────────────┐
-│ Vertex AI              │   │ Cloud Storage                 │
-│ (asia-southeast1)      │   │ (asia-northeast1)             │
-│                        │   │                               │
-│ virtual-try-on-001     │   │ garments/   ← 衣服画像        │
-│ imagen-3.0-generate-001│   │ mannequins/ ← マネキン画像    │
-│                        │   │ uploads/    ← 人物画像        │
-│                        │   │ results/    ← 試着結果        │
-└────────────────────────┘   └──────────────────────────────┘
+
+### CI/CD フロー
+
+```mermaid
+graph LR
+    DEV[👨‍💻 開発者] -->|git push main| GH[GitHub]
+    GH -->|Webhook| CB[Cloud Build<br/>asia-northeast1]
+    CB -->|docker push| AR[Artifact Registry<br/>asia-northeast1]
+    CB -->|gcloud run deploy| CR[Cloud Run v2]
 ```
 
 ---
@@ -257,13 +239,18 @@ iap_members              = ["domain:company.com"]      # 社員全員を許可�
    ├─ LB・NEG・Backend Service・IAP が作成される
    └─ terraform output lb_ip で IP アドレスを確認
 
-6. IAP の承認済みリダイレクト URI を設定（コンソールで手動）
+6. OAuth クライアントの承認済み URI を設定（コンソールで手動）
    └─ 手順 3 で作成した OAuth クライアント ID を編集
+      → 承認済みの JavaScript 生成元 に以下を追加:
+         https://{domain}
       → 承認済みのリダイレクト URI に以下を追加:
          https://iap.googleapis.com/v1/oauth/clientIds/{CLIENT_ID}:handleRedirect
 
-7. DNS A レコードを設定
-   └─ domain → lb_ip（取得した IP アドレス）
+7. DNS 設定（どちらか選択）
+   ├─ [Option A] sslip.io を使う場合（DNS 変更不要）
+   │     terraform.tfvars の domain を "<lb_ip>.sslip.io" に変更して再 apply
+   └─ [Option B] カスタムドメインの場合
+         DNS の A レコードに lb_ip を登録
 
 8. SSL 証明書のプロビジョニングを待つ（最大 60 分）
    └─ 確認: gcloud compute ssl-certificates describe virtual-try-on-cert \
