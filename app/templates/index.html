@@ -782,7 +782,6 @@
     try {
       const body = { person_gcs_uri: originalPersonGcsUri };
       if (selectedTop)    body.top_gcs_uri    = selectedTop.gcsUri;
-      if (selectedTop)    body.top_label      = selectedTop.label;
       if (selectedBottom) body.bottom_gcs_uri = selectedBottom.gcsUri;
 
       const res = await fetch('/api/tryon', {

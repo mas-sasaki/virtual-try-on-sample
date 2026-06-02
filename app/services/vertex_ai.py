@@ -20,35 +20,29 @@ def _get_access_token() -> str:
     return credentials.token
 
 
-def _call_tryon(
-    person_image_bytes: bytes,
-    garment_image_bytes: bytes,
-    categories_to_replace: list[str] | None = None,
-) -> bytes:
+def _call_tryon(person_image_bytes: bytes, garment_image_bytes: bytes) -> bytes:
     """Virtual Try-On API を1回呼び出す（garment は1枚のみ）。"""
     url = _ENDPOINT_TEMPLATE.format(
         region=settings.vertex_ai_region,
         project=settings.gcp_project,
     )
-    instance: dict = {
-        "personImage": {
-            "image": {
-                "bytesBase64Encoded": base64.b64encode(person_image_bytes).decode()
-            }
-        },
-        "productImages": [
+    payload = {
+        "instances": [
             {
-                "image": {
-                    "bytesBase64Encoded": base64.b64encode(garment_image_bytes).decode()
-                }
+                "personImage": {
+                    "image": {
+                        "bytesBase64Encoded": base64.b64encode(person_image_bytes).decode()
+                    }
+                },
+                "productImages": [
+                    {
+                        "image": {
+                            "bytesBase64Encoded": base64.b64encode(garment_image_bytes).decode()
+                        }
+                    }
+                ],
             }
         ],
-    }
-    if categories_to_replace:
-        instance["parameters"] = {"categories_to_replace": categories_to_replace}
-
-    payload = {
-        "instances": [instance],
         "parameters": {"sampleCount": 1},
     }
     headers = {
@@ -62,35 +56,19 @@ def _call_tryon(
     return base64.b64decode(encoded)
 
 
-_OUTERWEAR_KEYWORDS = {"jacket", "coat", "blazer", "cardigan", "outerwear", "outer"}
-
-# ガーメントラベルからアウターウェアか判定し、categories_to_replace を返す。
-# API がパラメータを未サポートの場合は None を返してフォールバック。
-def _categories_for_top(label: str | None) -> list[str] | None:
-    if not label:
-        return None
-    lower = label.lower()
-    if any(kw in lower for kw in _OUTERWEAR_KEYWORDS):
-        return ["outerwear"]
-    return None
-
-
 def run_virtual_tryon(
     person_image_bytes: bytes,
     top_image_bytes: bytes | None,
     bottom_image_bytes: bytes | None,
-    top_label: str | None = None,
 ) -> bytes:
     """
     トップス・ボトムスをそれぞれ試着する。
-    top_label にアウター系キーワード（jacket/coat/blazer等）が含まれる場合、
-    categories_to_replace=["outerwear"] をリクエストに付与して
-    インナーが消えないよう試みる（実験的・API サポート状況に依存）。
+    両方指定された場合はトップスを先に適用し、結果を人物画像として
+    ボトムスを続けて適用する（連鎖呼び出し）。
     """
     result = person_image_bytes
     if top_image_bytes:
-        cats = _categories_for_top(top_label)
-        result = _call_tryon(result, top_image_bytes, categories_to_replace=cats)
+        result = _call_tryon(result, top_image_bytes)
     if bottom_image_bytes:
         result = _call_tryon(result, bottom_image_bytes)
     return result
