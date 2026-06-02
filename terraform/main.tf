@@ -97,12 +97,12 @@ resource "google_cloud_run_v2_service" "service" {
   }
 }
 
-# allUsers を維持しつつ ingress 制限でネットワーク制御
-# 実際の認証は IAP (iap.tf) が担当する
-resource "google_cloud_run_v2_service_iam_member" "lb_invoker" {
+# IAP サービスエージェントに Cloud Run 呼び出し権限を付与
+# allUsers は組織ポリシーで禁止されているため IAP SA を使用
+resource "google_cloud_run_v2_service_iam_member" "iap_invoker" {
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.service.name
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-iap.iam.gserviceaccount.com"
 }
