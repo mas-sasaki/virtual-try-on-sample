@@ -216,52 +216,61 @@ Cloud Run (ingress = INTERNAL_LOAD_BALANCER)
 ### terraform.tfvars に追加が必要な変数
 
 ```hcl
-domain            = "tryon.company.com"        # カスタムドメイン
-iap_support_email = "admin@company.com"         # OAuth 同意画面のサポートメール
-iap_members       = ["domain:company.com"]      # 社員全員を許可する場合
-# iap_members     = ["group:dev@company.com"]   # 特定グループのみの場合
-# iap_members     = ["user:alice@company.com"]  # 特定ユーザーのみの場合
+domain                   = "tryon.company.com"
+iap_oauth2_client_id     = "xxxxx.apps.googleusercontent.com"
+iap_oauth2_client_secret = "GOCSPX-xxxxxx"
+iap_members              = ["domain:company.com"]      # 社員全員を許可する場合
+# iap_members            = ["group:dev@company.com"]   # 特定グループのみの場合
+# iap_members            = ["user:alice@company.com"]  # 特定ユーザーのみの場合
 ```
 
 ### セットアップ手順（IAP 有効化）
 
 ```
-1. GCP API 追加有効化
-   └─ gcloud services enable compute.googleapis.com iap.googleapis.com
+1. GCP API 有効化
+   └─ gcloud services enable \
+        compute.googleapis.com \
+        iap.googleapis.com \
+        artifactregistry.googleapis.com \
+        run.googleapis.com \
+        cloudbuild.googleapis.com \
+        aiplatform.googleapis.com \
+        storage.googleapis.com
 
 2. OAuth 同意画面を設定（コンソールで手動）
    └─ GCP コンソール → APIs & Services → OAuth 同意画面
       → ユーザーの種類: 「内部」（Google Workspace 組織内のみ）を選択
       → アプリ名・サポートメールを入力して保存
 
-3. terraform.tfvars に domain / iap_support_email / iap_members を追加
+3. OAuth クライアント ID を作成（コンソールで手動）
+   └─ GCP コンソール → APIs & Services → 認証情報
+      → 認証情報を作成 → OAuth クライアント ID
+      → アプリケーションの種類: 「ウェブ アプリケーション」
+      → 名前: "Virtual Try-On IAP"
+      → 作成後に表示される「クライアント ID」と「クライアントシークレット」を控える
+   ※ google_iap_brand / google_iap_client は 2025年7月以降廃止のため Terraform 管理外
 
-4. terraform apply
+4. terraform.tfvars に変数を追加
+   └─ domain / iap_oauth2_client_id / iap_oauth2_client_secret / iap_members を設定
+
+5. terraform apply
    ├─ LB・NEG・Backend Service・IAP が作成される
    └─ terraform output lb_ip で IP アドレスを確認
 
-5. DNS A レコードを設定
+6. IAP の承認済みリダイレクト URI を設定（コンソールで手動）
+   └─ 手順 3 で作成した OAuth クライアント ID を編集
+      → 承認済みのリダイレクト URI に以下を追加:
+         https://iap.googleapis.com/v1/oauth/clientIds/{CLIENT_ID}:handleRedirect
+
+7. DNS A レコードを設定
    └─ domain → lb_ip（取得した IP アドレス）
 
-6. SSL 証明書のプロビジョニングを待つ
-   └─ 最大 60 分程度かかる場合がある
+8. SSL 証明書のプロビジョニングを待つ（最大 60 分）
    └─ 確認: gcloud compute ssl-certificates describe virtual-try-on-cert \
                --global --format="value(managed.status)"
       "ACTIVE" になれば完了
 
-7. ブラウザで https://{domain} にアクセスして Google ログイン画面が表示されることを確認
-```
-
-### 既存 IAP Brand がある場合の対応
-
-プロジェクトに IAP Brand が既に存在する場合、`terraform apply` でエラーになる。以下でインポートする。
-
-```bash
-# プロジェクト番号の確認
-PROJECT_NUMBER=$(gcloud projects describe PROJECT_ID --format="value(projectNumber)")
-
-# import
-terraform import google_iap_brand.default projects/${PROJECT_NUMBER}/brands/${PROJECT_NUMBER}
+9. ブラウザで https://{domain} にアクセスして Google ログイン画面が表示されることを確認
 ```
 
 ---

@@ -32,31 +32,11 @@ resource "google_compute_region_network_endpoint_group" "cloudrun_neg" {
   }
 }
 
-# ---- IAP Brand ----
-# 注意: プロジェクトに既に IAP Brand が存在する場合は import が必要
-#   terraform import google_iap_brand.default \
-#     projects/PROJECT_NUMBER/brands/PROJECT_NUMBER
-# PROJECT_NUMBER の確認: gcloud projects describe PROJECT_ID --format="value(projectNumber)"
-
-resource "google_iap_brand" "default" {
-  support_email     = var.iap_support_email
-  application_title = "Virtual Try-On"
-  project           = var.project_id
-
-  lifecycle {
-    # IAP Brand は削除できないため destroy をスキップ
-    prevent_destroy = true
-  }
-}
-
-# ---- IAP OAuth2 クライアント ----
-
-resource "google_iap_client" "default" {
-  display_name = "Virtual Try-On IAP Client"
-  brand        = google_iap_brand.default.name
-}
-
 # ---- Backend Service (IAP 有効) ----
+# google_iap_brand / google_iap_client は July 2025 以降廃止のため Terraform 管理外。
+# GCP コンソールで OAuth クライアントを手動作成し、
+# iap_oauth2_client_id / iap_oauth2_client_secret を terraform.tfvars に設定すること。
+# 手順: docs/design.md「セクション 8」参照
 
 resource "google_compute_backend_service" "lb" {
   name    = "${var.service_name}-backend"
@@ -68,8 +48,8 @@ resource "google_compute_backend_service" "lb" {
 
   iap {
     enabled              = true
-    oauth2_client_id     = google_iap_client.default.client_id
-    oauth2_client_secret = google_iap_client.default.secret
+    oauth2_client_id     = var.iap_oauth2_client_id
+    oauth2_client_secret = var.iap_oauth2_client_secret
   }
 
   log_config {

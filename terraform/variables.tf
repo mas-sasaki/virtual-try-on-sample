@@ -47,9 +47,15 @@ variable "domain" {
   type        = string
 }
 
-variable "iap_support_email" {
-  description = "IAP OAuth 同意画面のサポートメールアドレス（プロジェクト管理者のアドレス）"
+variable "iap_oauth2_client_id" {
+  description = "IAP 用 OAuth2 クライアント ID（GCP コンソールで手動作成）"
   type        = string
+}
+
+variable "iap_oauth2_client_secret" {
+  description = "IAP 用 OAuth2 クライアントシークレット（GCP コンソールで手動作成）"
+  type        = string
+  sensitive   = true
 }
 
 variable "iap_members" {
