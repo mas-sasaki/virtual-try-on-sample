@@ -305,52 +305,29 @@ git push origin main  →  Cloud Build  →  Cloud Run（自動）
 
 ## 10. Vertex AI Virtual Try-On API 仕様
 
-### エンドポイント
+### 使用 SDK
 
-```
-POST https://{region}-aiplatform.googleapis.com/v1/projects/{project}
-     /locations/{region}/publishers/google/models/virtual-try-on-001:predict
+`google-genai` SDK（Vertex AI モード）を使用。`google-cloud-aiplatform` や REST 直叩きは使っていない。
+
+```python
+from google import genai
+from google.genai import types
+
+with genai.Client(vertexai=True, project=PROJECT, location=REGION) as client:
+    response = client.models.recontext_image(
+        model="virtual-try-on-001",
+        source=types.RecontextImageSource(
+            person_image=types.Image(image_bytes=person_bytes),
+            product_images=[
+                types.ProductImage(product_image=types.Image(image_bytes=garment_bytes))
+            ],
+        ),
+        config=types.RecontextImageConfig(number_of_images=1),
+    )
+result_bytes = response.generated_images[0].image.image_bytes
 ```
 
 **対応リージョン**: `asia-southeast1`（シンガポール）のみ確認済み。`asia-northeast1`（東京）は未対応。
-
-### リクエスト形式
-
-```json
-{
-  "instances": [
-    {
-      "personImage": {
-        "image": {
-          "bytesBase64Encoded": "<base64エンコードされた人物画像>"
-        }
-      },
-      "productImages": [
-        {
-          "image": {
-            "bytesBase64Encoded": "<base64エンコードされた衣服画像>"
-          }
-        }
-      ]
-    }
-  ],
-  "parameters": {
-    "sampleCount": 1
-  }
-}
-```
-
-### レスポンス形式
-
-```json
-{
-  "predictions": [
-    {
-      "bytesBase64Encoded": "<base64エンコードされた試着結果画像>"
-    }
-  ]
-}
-```
 
 ### API の制約・挙動
 
@@ -377,22 +354,24 @@ Virtual Try-On API は **1 呼び出しにつき衣服 1 枚** しか指定で�
 ```
 原人物画像
     │
-    ▼ API 呼び出し①（トップス）
-トップス試着済み画像
+    ▼ API 呼び出し①（ボトムス）
+ボトムス試着済み画像
     │
-    ▼ API 呼び出し②（ボトムス）
-トップス＋ボトムス試着済み画像（最終結果）
+    ▼ API 呼び出し②（トップス）
+ボトムス＋トップス試着済み画像（最終結果）
 ```
+
+**順序の理由**: トップスを後から適用すると API が上半身を処理する際にボトムスが残りやすい。先にボトムスを適用してからトップスを重ねることでトップスの消失を防ぐ。
 
 実装箇所: `app/services/vertex_ai.py` の `run_virtual_tryon()`
 
 ```python
 def run_virtual_tryon(person_bytes, top_bytes, bottom_bytes) -> bytes:
     result = person_bytes
-    if top_bytes:
-        result = _call_tryon(result, top_bytes)   # ① トップスを適用
     if bottom_bytes:
-        result = _call_tryon(result, bottom_bytes) # ② その結果にボトムスを適用
+        result = _call_tryon(result, bottom_bytes) # ① ボトムスを先に適用
+    if top_bytes:
+        result = _call_tryon(result, top_bytes)    # ② その結果にトップスを適用
     return result
 ```
 
@@ -449,7 +428,7 @@ def run_virtual_tryon(person_bytes, top_bytes, bottom_bytes) -> bytes:
 | **上着のみ試着すると下半身が素体に見える** | API が person 画像の衣服を除去して上着のみ適用するため。ボトムスも合わせて選択することで解消する。 |
 | **ジャケット着用時にインナーが消える** | API は上半身の衣服をすべて除去してから指定衣服を適用する設計のため、インナーとアウターを区別できない。`categories_to_replace` パラメータを試みたが API 未サポートであることを確認済み。回避策なし（API 仕様上の制限）。 |
 | **同種の衣服を重ねられない** | トップスは 1 枚のみ有効。新しいトップスを選ぶと前のトップスは置き換わる。 |
-| **試着順序は固定** | 必ずトップス→ボトムスの順で適用される。 |
+| **試着順序は固定** | 必ずボトムス→トップスの順で適用される（トップス消失防止のため）。 |
 
 ---
 
@@ -549,7 +528,7 @@ Virtual Try-On API を呼び出し、試着結果を返す。
 | `top_gcs_uri` | △ | トップス画像の GCS URI（`top_gcs_uri` か `bottom_gcs_uri` のどちらかは必須） |
 | `bottom_gcs_uri` | △ | ボトムス画像の GCS URI |
 
-両方指定された場合はサーバーサイドでチェーン実行（トップス→ボトムスの順）。
+両方指定された場合はサーバーサイドでチェーン実行（ボトムス→トップスの順）。
 
 **Response**
 ```json
@@ -592,11 +571,12 @@ Signed URL の代わりにこのエンドポイントを使う。Application Def
 | Web フレームワーク | FastAPI | 0.115+ |
 | ASGI サーバー | Uvicorn | 0.32+ |
 | パッケージ管理 | uv | — |
+| AI SDK | google-genai（Vertex AI モード） | 1.0+ |
 | 開発環境 | Nix + direnv | — |
 | コンテナ | Docker | — |
 | IaC | Terraform | 1.5+ |
 | CI/CD | Cloud Build | — |
 | AI モデル（試着） | Vertex AI `virtual-try-on-001` | — |
-| AI モデル（画像生成） | Vertex AI `imagen-3.0-generate-001` | — |
+| AI モデル（画像生成）| Vertex AI `imagen-3.0-generate-001`（スクリプト専用） | — |
 | ストレージ | Cloud Storage | — |
 | 実行環境 | Cloud Run v2 | — |

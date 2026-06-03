@@ -19,9 +19,19 @@ def _call_tryon(person_image_bytes: bytes, garment_image_bytes: bytes) -> bytes:
                     )
                 ],
             ),
-            config=types.RecontextImageConfig(number_of_images=1),
+            config=types.RecontextImageConfig(
+                number_of_images=1,
+                http_options=types.HttpOptions(timeout=120),
+            ),
         )
-    return response.generated_images[0].image.image_bytes
+
+    images = response.generated_images or []
+    if not images:
+        raise RuntimeError("Virtual Try-On API が画像を返しませんでした（安全フィルターによるブロックの可能性）")
+    image = images[0].image
+    if image is None or image.image_bytes is None:
+        raise RuntimeError("Virtual Try-On API のレスポンスに画像データが含まれていません")
+    return image.image_bytes
 
 
 def run_virtual_tryon(
