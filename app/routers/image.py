@@ -15,4 +15,8 @@ def proxy_image(uri: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
     content_type = "image/png" if uri.endswith(".png") else "image/jpeg"
-    return Response(content=data, media_type=content_type)
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )

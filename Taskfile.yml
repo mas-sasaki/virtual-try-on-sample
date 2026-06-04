@@ -69,6 +69,11 @@ tasks:
     cmds:
       - uv run python scripts/generate_garments.py
 
+  generate-fit-variants:
+    desc: Imagen 3 でフィット別衣服バリアント画像を生成して GCS にアップロード
+    cmds:
+      - uv run python scripts/generate_fit_variants.py
+
   # ---- セットアップ（初回） ----
 
   setup:

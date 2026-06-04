@@ -141,12 +141,22 @@ github_repo      = "virtual-try-on-sample"
 ```
 gs://BUCKET_NAME/
 ├── garments/
-│   ├── tops/          ← トップス画像（Tシャツ・ブラウス・カーディガン等）
-│   └── bottoms/       ← ボトムス画像（パンツ・スカート等）
-├── mannequins/        ← マネキン画像（男性・女性）
-├── uploads/           ← ユーザーがアップロードした人物画像（自動生成）
-└── results/           ← 試着結果画像（自動生成）
+│   ├── tops/               ← トップス・ジャストサイズ（Tシャツ・ブラウス・カーディガン等）
+│   │   ├── tight/          ← タイト（スリム）バリアント
+│   │   ├── oversized/      ← オーバーサイズバリアント
+│   │   ├── relaxed/        ← ゆったりバリアント
+│   │   └── box/            ← ボックスシルエットバリアント
+│   └── bottoms/            ← ボトムス・ジャストサイズ（パンツ・スカート等）
+│       ├── tight/
+│       ├── oversized/
+│       ├── relaxed/
+│       └── box/
+├── mannequins/             ← マネキン画像（男性・女性）
+├── uploads/                ← ユーザーがアップロードした人物画像（自動生成）
+└── results/                ← 試着結果画像（自動生成）
 ```
+
+フィットなし（`garments/tops/white-tshirt.png`）がジャストサイズ扱いとなり、後方互換性を保つ。フィットバリアントは `task generate-fit-variants` で生成。
 
 バケット作成:
 
@@ -337,7 +347,7 @@ result_bytes = response.generated_images[0].image.image_bytes
 | **衣服の除去** | API は person 画像に写っている既存の衣服を内部で除去した上で指定衣服を適用する |
 | **衣服カテゴリ指定** | トップス・ボトムスの区別を API に明示する手段はない（モデルが自動判定） |
 | **画像フォーマット** | PNG / JPEG 対応、base64 エンコードで送受信 |
-| **タイムアウト** | 1 衣服あたり最大約 60 秒 |
+| **タイムアウト** | 1 衣服あたり最大約 60 秒。`HttpOptions.timeout` の単位は**ミリ秒**（`180000` = 180 秒に設定） |
 
 ---
 
@@ -398,27 +408,37 @@ def run_virtual_tryon(person_bytes, top_bytes, bottom_bytes) -> bytes:
 | 変数 | 説明 |
 |------|------|
 | `originalPersonGcsUri` | 選択した人物画像の GCS URI（変更されない） |
-| `selectedTop` | 現在選択中のトップス `{gcsUri, label}` |
-| `selectedBottom` | 現在選択中のボトムス `{gcsUri, label}` |
+| `selectedTop` | 現在選択中のトップス `{gcsUri, label, baseName, fit, fits}` |
+| `selectedBottom` | 現在選択中のボトムス `{gcsUri, label, baseName, fit, fits}` |
+| `selectedTopFit` | トップスの現在選択シルエット（`just` / `tight` / `oversized` / `relaxed` / `box`） |
+| `selectedBottomFit` | ボトムスの現在選択シルエット |
+| `topFitSelections` | `{fit: entry}` — フィット別のトップス選択履歴 |
+| `bottomFitSelections` | `{fit: entry}` — フィット別のボトムス選択履歴 |
+| `topsGroups` | `{baseName: {fit: item}}` — 初回ロード時に全量取得したトップスデータ |
+| `bottomsGroups` | `{baseName: {fit: item}}` — 初回ロード時に全量取得したボトムスデータ |
 
-衣服カードを選択するたびに `selectedTop` または `selectedBottom` が更新され、`/api/tryon` に `originalPersonGcsUri` + 現在選択中の全衣服を送信する。
+衣服カードを選択するたびに `selectedTop` / `selectedBottom` と `topFitSelections[fit]` / `bottomFitSelections[fit]` が更新され、`/api/tryon` に `originalPersonGcsUri` + 現在選択中の全衣服を送信する。
 
 ### ユーザー操作フロー
 
 ```
 ① 人物を選択（マネキン or アップロード）
         │
-② 衣服カードをクリック（自動試着トリガー）
+② シルエットボタンで衣服グリッドの表示を切り替え（API 呼び出しなし）
+        │  ├─ フィット変更時は対象カテゴリの画像のみ切り替え（tops / bottoms 独立）
+        │  └─ 前回そのフィットで選択済みの衣服があれば選択状態を復元（試着は走らない）
+        │
+③ 衣服カードをクリック（自動試着トリガー）
         │
         ├─ トップスのみ選択 → API①のみ実行
         ├─ ボトムスのみ選択 → API①のみ実行
         └─ 両方選択済みの場合 → API①②を連続実行（最大2分）
         │
-③ 試着結果表示（試着前 / 試着後 の横並び比較）
+④ 試着結果表示（試着前 / 試着後 の横並び比較）
         │
-④ 別の衣服を選択 → ②に戻る（selectedTop/Bottom が更新されて再試着）
+⑤ 別の衣服 / シルエットを選択 → ③に戻る
         │
-⑤ リセットボタン → 選択クリア、元の人物画像に戻る
+⑥ リセットボタン → 選択クリア・シルエットをジャストにリセット、元の人物画像に戻る
 ```
 
 ### 既知の制限
@@ -461,10 +481,23 @@ GCS の `garments/` 配下の衣服一覧を返す。
   {
     "name": "tops/white-tshirt.png",
     "gcs_uri": "gs://bucket/garments/tops/white-tshirt.png",
-    "image_url": "/api/image?uri=gs%3A%2F%2F..."
+    "image_url": "/api/image?uri=gs%3A%2F%2F...",
+    "fit": "just",
+    "base_name": "white-tshirt",
+    "category": "tops"
+  },
+  {
+    "name": "tops/tight/white-tshirt.png",
+    "gcs_uri": "gs://bucket/garments/tops/tight/white-tshirt.png",
+    "image_url": "/api/image?uri=gs%3A%2F%2F...",
+    "fit": "tight",
+    "base_name": "white-tshirt",
+    "category": "tops"
   }
 ]
 ```
+
+フロントエンドは `base_name` でグルーピングし `{fit: item}` 辞書を構築。シルエット切り替え時は `<img src>` を差し替えるだけで API 呼び出しは不要。
 
 ---
 
@@ -561,9 +594,61 @@ Signed URL の代わりにこのエンドポイントを使う。Application Def
 
 **Response** 画像バイナリ（`image/jpeg` または `image/png`）
 
+`Cache-Control: public, max-age=86400, immutable` ヘッダーを付与。衣服・マネキン画像はブラウザに 24 時間キャッシュされるため、シルエット切り替え時の再フェッチが不要になる。
+
 ---
 
-## 13. 技術スタック
+## 13. シルエット（フィット）機能
+
+### 概要
+
+衣服に 5 種類のシルエット属性を持たせ、ユーザーが試着前にシルエットを選択できる。
+
+| フィットキー | 表示名 | 説明 |
+|-------------|--------|------|
+| `just` | ジャスト | 標準サイズ（既存画像） |
+| `tight` | タイト | スリム・体にフィット |
+| `oversized` | オーバーサイズ | 極端にゆったり・大きめ |
+| `relaxed` | ゆったり | 少しゆとりのあるルーズフィット |
+| `box` | ボックス | 肩から裾まで等幅のスクエアシルエット |
+
+### 実装方針
+
+Vertex AI Virtual Try-On API はテキストプロンプトによるシルエット指定をサポートしないため、**Imagen 3 で各フィットの衣服画像を事前生成**して GCS に保存する方式を採用。
+
+```
+虚偽の方法（不採用）: try-on API にシルエット指定を渡す → API 未対応
+実際の方法: 事前に Imagen 3 でフィット別画像を生成 → GCS 保存 → 該当画像で試着
+```
+
+### 画像生成スクリプト
+
+`scripts/generate_fit_variants.py`:
+
+- `scripts/generate_garments.py` の `GARMENTS` リストを参照して全衣服 × 4 フィットの画像を生成
+- 既存ファイルは skip（冪等・再実行可能）
+- プロンプト例：`"..., tight slim body-hugging silhouette, narrow fitted cut, flat lay ..."`
+
+```bash
+task generate-fit-variants
+```
+
+### フロントエンドの動作
+
+1. **初回ロード**: `GET /api/garments?category=tops` で全フィット分を一括取得し、`base_name` でグルーピング
+2. **シルエット切り替え**: `updateGridImages()` が各カードの `<img src>` を差し替えるのみ（API 呼び出しなし）
+3. **選択状態の記憶**: `topFitSelections[fit]` / `bottomFitSelections[fit]` にフィット別で保存。別フィットに切り替えて戻ると選択が復元される（試着は再実行しない）
+4. **試着**: 衣服カードを押したときのみ `/api/tryon` を呼ぶ
+
+### 画像キャッシュ
+
+- ページロード後に全フィット画像を `Image()` でバックグラウンドプリロード
+- `/api/image` に `Cache-Control: public, max-age=86400, immutable` を設定済み
+- 一度ブラウザにキャッシュされればシルエット切り替えは即時
+
+---
+
+## 14. 技術スタック
 
 | カテゴリ | 採用技術 | バージョン |
 |---------|---------|-----------|

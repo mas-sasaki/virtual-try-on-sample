@@ -226,9 +226,12 @@ direnv で環境変数を設定してから実行:
 
 ```bash
 # .envrc に GCP_PROJECT と GCS_BUCKET を設定済みであること
-task generate-garments    # 衣服画像（トップス・ボトムス）を生成して GCS にアップロード
-task generate-mannequins  # マネキン画像を生成して GCS にアップロード
+task generate-garments       # 衣服画像（トップス・ボトムス、ジャストサイズ）を生成して GCS にアップロード
+task generate-mannequins     # マネキン画像を生成して GCS にアップロード
+task generate-fit-variants   # 各衣服のシルエットバリアント（タイト・オーバーサイズ・ゆったり・ボックス）を生成
 ```
+
+`generate-fit-variants` は既存ファイルをスキップするため、途中で中断しても再実行可能。
 
 ---
 

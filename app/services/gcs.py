@@ -32,8 +32,31 @@ def _list_blobs(prefix: str) -> list[dict]:
     return results
 
 
+_VALID_FITS = {"just", "tight", "oversized", "relaxed", "box"}
+
+
 def list_garments() -> list[dict]:
-    return _list_blobs(settings.gcs_garments_prefix)
+    items = _list_blobs(settings.gcs_garments_prefix)
+    result = []
+    for item in items:
+        name = item["name"]  # e.g. "tops/white-tshirt.png" or "tops/oversized/white-tshirt.png"
+        parts = name.split("/")
+        if len(parts) == 2:
+            category, filename = parts
+            fit = "just"
+        elif len(parts) == 3:
+            category, fit, filename = parts
+            if fit not in _VALID_FITS:
+                continue
+        else:
+            continue
+        result.append({
+            **item,
+            "fit": fit,
+            "base_name": filename.rsplit(".", 1)[0],
+            "category": category,
+        })
+    return result
 
 
 def list_mannequins() -> list[dict]:

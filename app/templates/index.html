@@ -396,6 +396,39 @@
       margin-top: 10px;
       display: none;
     }
+
+    /* ---- Fit selector ---- */
+    .fit-selector {
+      margin-bottom: 10px;
+      padding: 7px 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .fit-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .fit-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .fit-btn {
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: var(--surface);
+      color: var(--text-muted);
+      transition: all .15s;
+    }
+    .fit-btn:hover { border-color: #a5b4fc; color: var(--primary); }
+    .fit-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
   </style>
 </head>
 <body>
@@ -472,6 +505,16 @@
           <div class="garment-col-title">
             <span class="dot dot-top"></span> トップス
           </div>
+          <div id="topsFitSelector" class="fit-selector">
+            <span class="fit-label">シルエット</span>
+            <div class="fit-btns">
+              <button class="fit-btn active" data-fit="just"      onclick="setColumnFit('top','just')">ジャスト</button>
+              <button class="fit-btn"         data-fit="tight"     onclick="setColumnFit('top','tight')">タイト</button>
+              <button class="fit-btn"         data-fit="oversized" onclick="setColumnFit('top','oversized')">オーバーサイズ</button>
+              <button class="fit-btn"         data-fit="relaxed"   onclick="setColumnFit('top','relaxed')">ゆったり</button>
+              <button class="fit-btn"         data-fit="box"       onclick="setColumnFit('top','box')">ボックス</button>
+            </div>
+          </div>
           <div id="topsGrid" class="item-grid">
             <div class="skeleton skeleton-card"></div>
             <div class="skeleton skeleton-card"></div>
@@ -481,6 +524,16 @@
         <div>
           <div class="garment-col-title">
             <span class="dot dot-bottom"></span> ボトムス
+          </div>
+          <div id="bottomsFitSelector" class="fit-selector">
+            <span class="fit-label">シルエット</span>
+            <div class="fit-btns">
+              <button class="fit-btn active" data-fit="just"      onclick="setColumnFit('bottom','just')">ジャスト</button>
+              <button class="fit-btn"         data-fit="tight"     onclick="setColumnFit('bottom','tight')">タイト</button>
+              <button class="fit-btn"         data-fit="oversized" onclick="setColumnFit('bottom','oversized')">オーバーサイズ</button>
+              <button class="fit-btn"         data-fit="relaxed"   onclick="setColumnFit('bottom','relaxed')">ゆったり</button>
+              <button class="fit-btn"         data-fit="box"       onclick="setColumnFit('bottom','box')">ボックス</button>
+            </div>
           </div>
           <div id="bottomsGrid" class="item-grid">
             <div class="skeleton skeleton-card"></div>
@@ -540,8 +593,17 @@
   let originalPersonImgUrl = null;
   let originalPersonLabel  = null;
   let isTryingOn           = false;
-  let selectedTop          = null; // {gcsUri, label}
-  let selectedBottom       = null; // {gcsUri, label}
+  let selectedTop          = null; // {gcsUri, label, baseName, fit, fits}
+  let selectedBottom       = null; // {gcsUri, label, baseName, fit, fits}
+  let topsGroups           = {};   // { baseName: { fit: item } }
+  let bottomsGroups        = {};   // { baseName: { fit: item } }
+  let selectedTopFit       = 'just';
+  let selectedBottomFit    = 'just';
+  let topFitSelections     = {};  // { fit: entry } — per-fit saved selections for tops
+  let bottomFitSelections  = {};  // { fit: entry } — per-fit saved selections for bottoms
+
+  const FIT_LABELS = { just: 'ジャスト', tight: 'タイト', oversized: 'オーバーサイズ', relaxed: 'ゆったり', box: 'ボックス' };
+  function fitLabel(fit) { return FIT_LABELS[fit] || fit; }
 
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', () => {
@@ -648,36 +710,108 @@
     ]);
     const tops    = topsRes.ok    ? await topsRes.json()    : [];
     const bottoms = bottomsRes.ok ? await bottomsRes.json() : [];
-    renderGarmentGrid('topsGrid',    tops,    'top');
-    renderGarmentGrid('bottomsGrid', bottoms, 'bottom');
+    topsGroups    = groupByBase(tops);
+    bottomsGroups = groupByBase(bottoms);
+    renderGarmentGrid('topsGrid',    topsGroups,    'top');
+    renderGarmentGrid('bottomsGrid', bottomsGroups, 'bottom');
+    preloadGarmentImages(topsGroups);
+    preloadGarmentImages(bottomsGroups);
   }
 
-  function renderGarmentGrid(gridId, items, kind) {
+  function preloadGarmentImages(groups) {
+    Object.values(groups).forEach(fits => {
+      Object.values(fits).forEach(item => {
+        const img = new Image();
+        img.src = item.image_url;
+      });
+    });
+  }
+
+  function groupByBase(items) {
+    const groups = {};
+    items.forEach(g => {
+      const baseName = g.base_name || g.name.replace(/^(tops|bottoms)\//, '').replace(/\.[^.]+$/, '');
+      if (!groups[baseName]) groups[baseName] = {};
+      groups[baseName][g.fit || 'just'] = g;
+    });
+    return groups;
+  }
+
+  function renderGarmentGrid(gridId, groups, kind) {
     const grid = document.getElementById(gridId);
     grid.innerHTML = '';
-    if (!items.length) {
+    const entries = Object.entries(groups);
+    if (!entries.length) {
       grid.innerHTML = '<p style="color:#94a3b8;font-size:.8rem;">画像がありません</p>';
       return;
     }
-    items.forEach(g => {
-      const displayLabel = g.name.replace(/^(tops|bottoms)\//, '').replace(/\.png$/, '');
-      const card = makeCard({ imageUrl: g.image_url, label: displayLabel, square: true });
-      card.onclick = () => garmentClicked(card, grid, g.gcs_uri, displayLabel, kind);
+    const currentFit = kind === 'top' ? selectedTopFit : selectedBottomFit;
+    entries.forEach(([baseName, fits]) => {
+      const displayItem = fits[currentFit] || fits['just'] || Object.values(fits)[0];
+      const card = makeCard({ imageUrl: displayItem.image_url, label: baseName, square: true });
+      card.dataset.baseName = baseName;
+      card.onclick = () => garmentClicked(card, grid, fits, baseName, kind);
       grid.appendChild(card);
     });
   }
 
-  function garmentClicked(card, grid, gcsUri, label, kind) {
+  function updateGridImages(gridId, groups, fit) {
+    document.getElementById(gridId).querySelectorAll('.item-card').forEach(card => {
+      const fits = groups[card.dataset.baseName];
+      if (!fits) return;
+      const fitItem = fits[fit] || fits['just'];
+      if (fitItem) card.querySelector('.thumb').src = fitItem.image_url;
+    });
+  }
+
+  function garmentClicked(card, grid, fits, baseName, kind) {
     if (isTryingOn) return;
-    if (!originalPersonGcsUri) {
-      showNoPersonHint();
-      return;
-    }
+    if (!originalPersonGcsUri) { showNoPersonHint(); return; }
     grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
-    if (kind === 'top')  selectedTop    = { gcsUri, label };
-    else                 selectedBottom = { gcsUri, label };
+    const currentFit = kind === 'top' ? selectedTopFit : selectedBottomFit;
+    const fitItem = fits[currentFit] || fits['just'] || Object.values(fits)[0];
+    const entry = { gcsUri: fitItem.gcs_uri, label: baseName, baseName, fit: currentFit, fits };
+    if (kind === 'top') {
+      selectedTop = entry;
+      topFitSelections[currentFit] = entry;
+    } else {
+      selectedBottom = entry;
+      bottomFitSelections[currentFit] = entry;
+    }
     runTryOn();
+  }
+
+  function setColumnFit(kind, fit) {
+    if (kind === 'top') selectedTopFit = fit;
+    else               selectedBottomFit = fit;
+
+    const selectorId = kind === 'top' ? 'topsFitSelector' : 'bottomsFitSelector';
+    document.getElementById(selectorId).querySelectorAll('.fit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.fit === fit);
+    });
+
+    const gridId = kind === 'top' ? 'topsGrid' : 'bottomsGrid';
+    const groups = kind === 'top' ? topsGroups  : bottomsGroups;
+    updateGridImages(gridId, groups, fit);
+
+    // Restore saved selection for this fit, or clear
+    const fitSelections = kind === 'top' ? topFitSelections : bottomFitSelections;
+    const saved = fitSelections[fit];
+    const grid  = document.getElementById(gridId);
+    grid.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+
+    if (saved) {
+      const fitItem = saved.fits[fit] || saved.fits['just'] || Object.values(saved.fits)[0];
+      const restored = { ...saved, gcsUri: fitItem.gcs_uri, fit };
+      if (kind === 'top') selectedTop    = restored;
+      else                selectedBottom = restored;
+      const card = [...grid.querySelectorAll('.item-card')].find(c => c.dataset.baseName === saved.baseName);
+      if (card) card.classList.add('selected');
+    } else {
+      if (kind === 'top') selectedTop    = null;
+      else                selectedBottom = null;
+    }
   }
 
   // ===== Helpers =====
@@ -726,6 +860,17 @@
   function clearGarmentSelection() {
     document.querySelectorAll('#topsGrid .item-card, #bottomsGrid .item-card')
       .forEach(c => c.classList.remove('selected'));
+    selectedTopFit      = 'just';
+    selectedBottomFit   = 'just';
+    topFitSelections    = {};
+    bottomFitSelections = {};
+    updateGridImages('topsGrid',    topsGroups,    'just');
+    updateGridImages('bottomsGrid', bottomsGroups, 'just');
+    ['topsFitSelector', 'bottomsFitSelector'].forEach(id => {
+      document.getElementById(id).querySelectorAll('.fit-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.fit === 'just');
+      });
+    });
   }
 
   // ===== Reset =====
@@ -757,8 +902,8 @@
   function updateAppliedChips() {
     const el = document.getElementById('appliedChips');
     const chips = [];
-    if (selectedTop)    chips.push(`<span class="applied-chip chip-top">トップス: ${selectedTop.label}</span>`);
-    if (selectedBottom) chips.push(`<span class="applied-chip chip-bottom">ボトムス: ${selectedBottom.label}</span>`);
+    if (selectedTop)    chips.push(`<span class="applied-chip chip-top">トップス: ${selectedTop.label} (${fitLabel(selectedTop.fit)})</span>`);
+    if (selectedBottom) chips.push(`<span class="applied-chip chip-bottom">ボトムス: ${selectedBottom.label} (${fitLabel(selectedBottom.fit)})</span>`);
     el.innerHTML = chips.join('');
     el.style.display = chips.length ? '' : 'none';
   }

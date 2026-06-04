@@ -21,7 +21,7 @@ def _call_tryon(person_image_bytes: bytes, garment_image_bytes: bytes) -> bytes:
             ),
             config=types.RecontextImageConfig(
                 number_of_images=1,
-                http_options=types.HttpOptions(timeout=120),
+                http_options=types.HttpOptions(timeout=180000),
             ),
         )
 
