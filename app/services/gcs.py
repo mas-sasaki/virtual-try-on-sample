@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from urllib.parse import urlparse, urlencode
 
@@ -92,6 +93,33 @@ def save_result_image(image_bytes: bytes) -> dict:
         "gcs_uri": gcs_uri,
         "image_url": _image_url(gcs_uri),
     }
+
+
+def _tryon_cache_blob_name(person_uri: str, top_uri: str | None, bottom_uri: str | None) -> str:
+    raw = f"{person_uri}|{top_uri or ''}|{bottom_uri or ''}"
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    return f"{settings.gcs_results_prefix}cache/{digest}.png"
+
+
+def get_cached_tryon(person_uri: str, top_uri: str | None, bottom_uri: str | None) -> dict | None:
+    blob_name = _tryon_cache_blob_name(person_uri, top_uri, bottom_uri)
+    client = _client()
+    blob = client.bucket(settings.gcs_bucket).blob(blob_name)
+    if not blob.exists():
+        return None
+    gcs_uri = f"gs://{settings.gcs_bucket}/{blob_name}"
+    return {"gcs_uri": gcs_uri, "image_url": _image_url(gcs_uri)}
+
+
+def save_cached_tryon(
+    person_uri: str, top_uri: str | None, bottom_uri: str | None, image_bytes: bytes
+) -> dict:
+    blob_name = _tryon_cache_blob_name(person_uri, top_uri, bottom_uri)
+    client = _client()
+    blob = client.bucket(settings.gcs_bucket).blob(blob_name)
+    blob.upload_from_string(image_bytes, content_type="image/png")
+    gcs_uri = f"gs://{settings.gcs_bucket}/{blob_name}"
+    return {"gcs_uri": gcs_uri, "image_url": _image_url(gcs_uri)}
 
 
 def get_blob_bytes(gcs_uri: str) -> bytes:
